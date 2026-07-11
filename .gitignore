@@ -1,0 +1,36 @@
+# ANVIL local state + secrets - never commit these
+.env
+.env.*
+!.env.example
+persona.json
+anvil.toml
+# backups/variants of the gitignored config must never sneak in (e.g. a .bak of
+# a secret-bearing file); the bare 'anvil.toml' above only matches the exact name
+anvil.toml.*
+*.bak
+*.bak-autonomy
+memory/
+conversations/
+backups/
+family_docs/
+jobs/
+ledger.jsonl
+test-reports/
+dev-reports/
+workspace/
+.venv/
+__pycache__/
+*.pyc
+*.tmp
+.anvil_write_probe
+
+# Forge Council runtime state - mutable, regenerated, survives git reverts
+# (the tracked council code lives in forge/{roles,prompts,*.ps1,scan.py,STATE.md,README.md})
+forge/queue/
+forge/builds/
+forge/reviews/
+forge/status.md
+forge/_usage.csv
+.claude/launch.json
+.forge.lock
+.forge-work/

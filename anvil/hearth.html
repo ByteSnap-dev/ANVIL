@@ -1,0 +1,1961 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#131110">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/flame-180.png">
+<title>Lara</title>
+<style>
+/* ============ HEARTHLIGHT — tokens ============ */
+:root{
+  --s0:#131110; --s1:#1d1a17; --s2:#282320; --s3:#332d28;
+  --hi:#f4ede4; --mid:#b8ac9e; --low:#93877a;
+  --ember:#f0883e; --ember-hi:#ffb877; --on-ember:#231103;
+  --glow:rgba(240,136,62,.14); --line:#3a332c;
+  --ok:#4cc06a; --ok-soft:rgba(76,192,106,.12);
+  --warn:#e6b23c; --warn-soft:rgba(230,178,60,.12);
+  --danger:#f2635a; --danger-soft:rgba(242,99,90,.12);
+  --info:#6fb3ff; --info-soft:rgba(111,179,255,.12);
+  --scrim:rgba(19,15,12,.6);
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px;
+  --sans:-apple-system,"Segoe UI",system-ui,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --measure:68ch;      /* the reading column — grows with the viewport */
+  --sidebar:280px;     /* docked conversations column */
+  --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+  --nav-h:calc(58px + env(safe-area-inset-bottom));
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme=dark]){
+  --s0:#faf6f0; --s1:#ffffff; --s2:#f1ebe2; --s3:#e7dfd3;
+  --hi:#241f19; --mid:#5c554b; --low:#7a7267;
+  --ember:#c25f08; --ember-hi:#a04e05; --on-ember:#ffffff;
+  --glow:rgba(194,95,8,.12); --line:#e2d9cc; --scrim:rgba(60,50,40,.35);
+}}
+:root[data-theme=light]{
+  --s0:#faf6f0; --s1:#ffffff; --s2:#f1ebe2; --s3:#e7dfd3;
+  --hi:#241f19; --mid:#5c554b; --low:#7a7267;
+  --ember:#c25f08; --ember-hi:#a04e05; --on-ember:#ffffff;
+  --glow:rgba(194,95,8,.12); --line:#e2d9cc; --scrim:rgba(60,50,40,.35);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* [hidden] must always win — component display rules (.btn etc.) otherwise beat it */
+[hidden]{display:none!important}
+/* Scrollbars stay out of the way — content scrolls, chrome doesn't show. */
+*{scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{width:0;height:0;display:none}
+html,body{margin:0;height:100%;overscroll-behavior:none}
+body{background:var(--s0);color:var(--hi);font:16px/1.55 var(--sans)}
+/* Pinned to the viewport edges outright — no height chain to mis-measure.
+   iOS standalone under-reported both 100dvh and the 100% chain, leaving a
+   dead band under the nav; fixed inset:0 tracks the real screen, and the
+   nav's safe-area padding covers the home-indicator strip. */
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--ember-hi);outline-offset:2px}
+a{color:var(--info)}
+
+/* ---- components ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;padding:10px 18px;border-radius:var(--r-md);border:1px solid var(--line);
+  background:var(--s2);color:var(--hi);font-weight:600;font-size:15px}
+.btn.primary{background:var(--ember);border-color:var(--ember);color:var(--on-ember)}
+.btn.quiet{background:transparent}
+.btn.danger{background:var(--danger-soft);border-color:var(--danger);color:var(--danger)}
+.armed{background:var(--danger-soft)!important;border-color:var(--danger)!important;color:var(--danger)!important}
+.btn.icon{min-width:44px;padding:10px}
+.btn:active{transform:translateY(1px)}
+.card{background:var(--s1);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 11px;
+  font-size:13px;font-weight:600;background:var(--s2);border:1px solid var(--line);color:var(--mid)}
+.chip.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.danger{background:var(--danger-soft);color:var(--danger);border-color:transparent}
+.chip.info{background:var(--info-soft);color:var(--info);border-color:transparent}
+.hint{font-size:13.5px;color:var(--low)}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+h2{font-size:19px} h3{font-size:16px}
+input[type=text],input[type=password],textarea,select{width:100%;background:var(--s2);
+  border:1px solid var(--line);border-radius:var(--r-md);padding:11px 13px;font-size:16px;color:var(--hi)}
+label{display:block;font-size:13.5px;color:var(--mid);margin:10px 0 4px;font-weight:600}
+.row{display:flex;gap:10px;align-items:center}
+.grow{flex:1}
+.mut{color:var(--low)}
+
+/* ---- shell ---- */
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;
+  padding-top:calc(10px + env(safe-area-inset-top));border-bottom:1px solid var(--line);background:var(--s0)}
+.flame{width:38px;height:38px;border-radius:50%;background:var(--s1);flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;border:1px solid var(--line);
+  box-shadow:0 0 18px 2px var(--glow)}
+.flame svg{width:20px;height:20px}
+@keyframes breathe{0%,100%{box-shadow:0 0 14px 1px var(--glow)}50%{box-shadow:0 0 26px 6px rgba(240,136,62,.24)}}
+@keyframes flicker{0%,100%{box-shadow:0 0 20px 3px rgba(240,136,62,.3)}25%{box-shadow:0 0 30px 8px rgba(240,136,62,.42)}60%{box-shadow:0 0 16px 2px rgba(240,136,62,.25)}}
+.flame.rest{animation:breathe 5s ease-in-out infinite}
+.flame.think{animation:flicker 1.1s ease-in-out infinite}
+.flame.speak{box-shadow:0 0 30px 8px rgba(240,136,62,.38)}
+@media (prefers-reduced-motion:reduce){.flame{animation:none!important}.caret{animation:none}}
+.htitle{flex:1;min-width:0}
+.htitle b{font:600 18px var(--serif);letter-spacing:.2px}
+#presence{font-size:12.5px;color:var(--low);display:block}
+#badge{display:none;background:var(--ember);color:var(--on-ember);border:none;cursor:pointer;
+  border-radius:999px;min-width:26px;height:26px;font:700 13px/26px var(--sans);text-align:center;padding:0 8px}
+#offbar{background:var(--warn-soft);color:var(--warn);font-size:12.5px;font-weight:600;
+  text-align:center;padding:5px 12px;border-bottom:1px solid var(--line);flex:0 0 auto}
+main{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.view{display:none;max-width:760px;margin:0 auto;padding:16px 16px 24px}
+.view.on{display:block}
+/* Bottom nav is IN-FLOW (last child of #app), so it always sits flush under the
+   composer — no fixed-overlay gap. On wide screens the tabs center instead of
+   stretching edge to edge. */
+nav{display:flex;justify-content:center;background:var(--s1);
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);flex:0 0 auto}
+nav button{flex:1;max-width:170px;background:none;border:none;padding:8px 0 10px;color:var(--low);
+  font:600 11.5px var(--sans);display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px}
+nav button svg{width:23px;height:23px}
+nav button.on{color:var(--ember)}
+nav button:focus-visible{outline-offset:-2px}
+
+/* ---- chat ---- */
+#view-chat{display:none;flex-direction:column;height:100%;max-width:none;padding:0}
+#view-chat.on{display:flex}
+/* chat controls live in the single header and only show on the Chat tab */
+.chatctl{display:none}
+body[data-view=chat] .chatctl{display:inline-flex}
+#presence{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52vw}
+body[data-view=chat] #presence{cursor:pointer}
+/* in-place title editing — the TEXT ITSELF becomes editable: same size, same
+   spot, just an ember caret and an ember-tinted selection. No box, no balloon. */
+.editing{cursor:text;caret-color:var(--ember);color:var(--hi);outline:none;
+  text-overflow:clip;user-select:text;-webkit-user-select:text;min-width:40px}
+.editing::selection{background:rgba(240,136,62,.35)}
+/* phones: 16px while editing is the iOS no-focus-zoom floor — borderless, so
+   the line grows a touch but nothing box-like appears */
+@media (max-width:899px){.editing{font-size:16px}}
+#msgs{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:16px 14px 8px}
+.mrow{max-width:var(--measure);margin:0 auto 14px}
+.msg{padding:2px 0;font-size:16px;line-height:1.65}
+/* Claude-app DNA: HER words sit directly on the page; only YOURS get a
+   bubble, hugging its content on the right */
+.msg.user{background:var(--s2);border-radius:var(--r-lg);padding:10px 15px;
+  margin-left:auto;width:fit-content;max-width:86%}
+.msg.user .attnote{display:block;margin-top:6px;font-size:12.5px;color:var(--low)}
+.msg.lara p{margin:8px 0}
+.msg.lara h1{font-size:23px;margin:14px 0 6px}.msg.lara h2{font-size:19px;margin:12px 0 6px}
+.msg.lara h3{font-size:16px;margin:10px 0 4px}
+.msg.lara h1,.msg.lara h2,.msg.lara h3{font-family:var(--serif);font-weight:600;letter-spacing:.2px}
+.msg.lara code{font:14px var(--mono);background:var(--s2);padding:1px 6px;border-radius:6px}
+.msg.lara pre{background:var(--s2);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:12px;overflow-x:auto}
+.msg.lara pre code{background:none;padding:0}
+.msg.lara ul,.msg.lara ol{margin:8px 0;padding-left:24px}
+.msg.lara table,#vBody table{border-collapse:collapse;margin:10px 0;font-size:14px;
+  display:block;max-width:100%;overflow-x:auto}
+.msg.lara th,.msg.lara td,#vBody th,#vBody td{border:1px solid var(--line);padding:6px 12px;text-align:left}
+.msg.lara th,#vBody th{background:var(--s2);font-weight:600}
+.caret{display:inline-block;width:8px;height:18px;background:var(--ember);border-radius:2px;
+  vertical-align:text-bottom;margin-left:1px;box-shadow:0 0 8px 1px var(--glow)}
+/* While typing, the caret is SOLID (it's moving, so it shouldn't also blink);
+   once she's done it settles into a gentle pulse before it's removed. */
+.msg.lara.typing{white-space:pre-wrap}
+.msg.lara.typing .caret{animation:none}
+.caret{animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.meta{font-size:12.5px;color:var(--low);margin-top:6px}
+.meta details{display:inline}.meta summary{cursor:pointer;display:inline;color:var(--low)}
+.meta .copyans{background:none;border:none;padding:0;font-size:12.5px;color:var(--low);
+  cursor:pointer;text-decoration:none}
+.meta .copyans:hover{color:var(--hi)}
+/* New-chat empty state: the ONLY place the suggestion chips live — you're
+   never sent here, you land in it when a chat is fresh. */
+/* Claude-app-style landing: a serif salutation floating in calm space, the
+   flame as a small quiet mark, suggestions as thin-bordered quiet pills */
+#greeting{max-width:58ch;margin:0 auto;text-align:center;padding:16vh 12px 0}
+#greeting .gflame{width:46px;height:46px;border-radius:50%;background:var(--s1);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 0 22px 3px var(--glow);
+  animation:breathe 5s ease-in-out infinite}
+#greeting .gflame svg{width:24px;height:24px}
+#greeting h2{font:500 clamp(26px,5vw,32px)/1.25 var(--serif);letter-spacing:.2px;margin:0;
+  text-wrap:balance}
+#greeting .gsub{color:var(--mid);margin:10px 0 26px;font-size:15px}
+#greeting .qa{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#greeting .qa .btn{min-height:50px;font-size:14px;font-weight:500;background:var(--s1);
+  color:var(--mid);border-radius:var(--r-lg)}
+#greeting .qa .btn:hover{background:var(--s2);color:var(--hi)}
+@media (max-width:520px){#greeting .qa{grid-template-columns:1fr}#greeting{padding-top:10vh}}
+.thinkbox{font-size:13px;color:var(--low);font-style:italic;border-left:2px solid var(--line);
+  padding-left:10px;margin:6px 0;max-height:120px;overflow-y:auto;white-space:pre-wrap}
+/* ---- kid mode (issue #64): simplified chat register ----
+   Applied via body.kid, set from /api/me's role field. Purely cosmetic/CSS +
+   a small JS guard — no server/API changes, no touch to the approval-card
+   ('waiting for a parent') copy or logic. */
+body.kid #msgs,body.kid .msg{font-size:17px}
+body.kid .meta .trace,body.kid .meta details.trace{display:none}
+body.kid .thinkbox{display:none}
+body.kid .actline{display:none}
+body.kid #navSystem{display:none!important}
+body.kid .trace .think,body.kid .trace .tcode,body.kid .trace .klabel{display:none}
+.thinkbox::before{content:"✳ thinking";display:block;font-style:normal;font-size:11px;
+  letter-spacing:.5px;color:var(--low);opacity:.8;margin-bottom:3px}
+.errcard{background:var(--danger-soft);border:1px solid var(--danger);border-radius:var(--r-lg);
+  padding:12px 15px;color:var(--hi)}
+.errcard .btn{margin-top:8px}
+/* the composer is ONE quiet bordered field with the controls inside it —
+   attach on the left, send riding the right edge (Claude-app style) */
+#composer{display:flex;flex-direction:column;gap:8px;padding:8px 12px 10px;background:var(--s0)}
+.composerRow{display:flex;gap:4px;align-items:flex-end;max-width:var(--measure);width:100%;margin:0 auto;
+  background:var(--s1);border:1px solid var(--line);border-radius:24px;padding:5px 5px 5px 6px;
+  transition:border-color .15s ease,box-shadow .15s ease}
+.composerRow:focus-within{border-color:var(--ember);box-shadow:0 0 0 1px var(--ember) inset}
+#task{flex:1;resize:none;max-height:120px;min-height:40px;border:none;background:transparent;
+  padding:10px 8px;font-size:16px;outline:none;border-radius:0}
+#attachBtn{min-width:40px;min-height:40px;width:40px;height:40px;border-radius:50%;flex:0 0 auto;
+  font-size:20px;line-height:1;padding:0;border:none;background:transparent;color:var(--mid)}
+#attachBtn:hover{background:var(--s2)}
+#send{min-width:40px;min-height:40px;width:40px;height:40px;border-radius:50%;background:var(--ember);color:var(--on-ember);
+  border:none;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+#send svg{width:20px;height:20px}
+#stopBtn{display:none}
+/* attachment previews (photos, sampled video frames, text files) */
+#attachRow{display:flex;gap:8px;flex-wrap:wrap}
+#attachRow[hidden]{display:none}
+.att{position:relative;width:60px;height:60px;border-radius:var(--r-md);overflow:hidden;border:1px solid var(--line);background:var(--s2)}
+.att img{width:100%;height:100%;object-fit:cover;display:block}
+.att.file{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--mid);text-align:center;padding:4px;word-break:break-word}
+.att .n{position:absolute;left:0;right:0;bottom:0;background:var(--scrim);color:#fff;font-size:9px;padding:1px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att .x{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;cursor:pointer;
+  background:var(--scrim);color:#fff;font-size:12px;line-height:20px;padding:0;display:flex;align-items:center;justify-content:center}
+/* approval card */
+.appr{background:var(--s1);border:1px solid var(--line);border-left:3px solid var(--ember);
+  border-radius:var(--r-lg);padding:14px 16px;margin:8px 0;box-shadow:0 1px 10px rgba(0,0,0,.10)}
+.appr h4{margin:6px 0 3px;font-size:16.5px}
+.appr .why{color:var(--mid);font-style:italic;font-size:14px;margin-bottom:8px}
+.appr details{font-size:13px;color:var(--low);margin:6px 0 10px}
+.appr .btns{display:flex;gap:10px;margin-top:4px}
+.appr .btns .btn{flex:1}
+.appr .exp{margin-top:8px;font-size:12.5px;color:var(--warn);text-align:center}
+/* Groceries card + approvals audit log (Family tab) */
+.grorow{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line)}
+.grorow:last-child{border-bottom:none}
+.grocheck{width:26px;height:26px;border-radius:8px;border:1.5px solid var(--line);
+  background:var(--s1);color:var(--ok);font-size:15px;line-height:1;flex:0 0 auto;padding:0}
+.grorow.done .grocheck{border-color:var(--ok);background:var(--ok-soft)}
+.grotext{flex:1;min-width:0;font-size:15px;overflow:hidden;text-overflow:ellipsis}
+.grorow.done .grotext{text-decoration:line-through;color:var(--low)}
+.groby{font-size:11.5px;color:var(--low)}
+.grox{border:none;background:none;color:var(--low);font-size:13px;padding:4px 6px;flex:0 0 auto}
+.grox:hover{color:var(--danger)}
+.grocadd{display:flex;gap:8px;margin-top:10px}
+.grocadd input{flex:1}
+.alogrow{display:flex;align-items:baseline;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line);
+  font-size:13.5px;flex-wrap:wrap}
+.alogrow:last-child{border-bottom:none}
+.alogwhat{flex:1;min-width:200px;color:var(--hi)}
+.alogwhat code{font:12px var(--mono);background:var(--s2);padding:1px 5px;border-radius:5px}
+.alogmeta{font-size:11.5px;color:var(--low);white-space:nowrap}
+/* answered cards SHRINK to a quiet one-liner — the decision is recorded,
+   but the conversation's real content keeps the stage */
+.appr.resolved{opacity:.72;border-left-color:var(--ok);box-shadow:none;
+  padding:7px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.appr.resolved h4{margin:0;font-size:13px;font-weight:600}
+.appr.resolved .why,.appr.resolved details,.appr.resolved .left{display:none}
+.appr.resolved .btns{margin:0}
+.appr.resolved .chip{font-size:11.5px;padding:2px 8px}
+.appr.resolved .exp{margin:0;font-size:11.5px;text-align:left}
+.appr.expired{opacity:.7;border-left-color:var(--line);box-shadow:none}
+/* drawer */
+#drawer{position:fixed;inset:0;z-index:60;display:none}
+#drawer.on{display:block}
+#drawer .scrim{position:absolute;inset:0;background:var(--scrim)}
+#drawer .panel{position:absolute;top:0;bottom:0;left:0;width:min(320px,86vw);background:var(--s1);
+  border-right:1px solid var(--line);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+#drawer .panel .top{padding:12px;border-bottom:1px solid var(--line)}
+#chatList{flex:1;overflow-y:auto}
+.chatrow{display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid var(--line)}
+.chatrow .main{flex:1;min-width:0;text-align:left;background:none;border:none;padding:9px 4px;min-height:44px}
+.chatrow .t{display:block;font-size:14.5px;color:var(--hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chatrow .s{display:block;font-size:12px;color:var(--low)}
+.chatrow .act{background:none;border:none;color:var(--low);min-width:40px;min-height:44px;font-size:15px}
+.chatrow.on .t{color:var(--ember)}
+
+/* ---- home ---- */
+.stack{display:flex;flex-direction:column;gap:12px}
+.hkv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.hkv:last-child{border-bottom:none}
+.hkv .v{color:var(--mid);text-align:right}
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qa .btn{min-height:52px;font-size:14.5px}
+.pill-ok{color:var(--ok)} .pill-off{color:var(--low)}
+
+/* lists */
+.notecard{background:var(--s1);border:1px solid var(--line);border-radius:var(--r-lg);padding:13px 15px;margin-bottom:10px}
+.notecard .b{font-size:15px}
+.notecard .who{font-size:12.5px;color:var(--low);margin-top:5px}
+.notecard .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px}
+.notecard .acts .btn{min-height:32px;padding:5px 12px;font-size:13px}
+.sharerow{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.chipbtn{border-radius:999px;padding:6px 13px;font-size:13px;font-weight:600;cursor:pointer;
+  background:var(--s2);border:1px solid var(--line);color:var(--mid)}
+.chipbtn.on{background:var(--ember);border-color:var(--ember);color:var(--on-ember)}
+/* live activity + "how I got here" trace under an answer */
+.actline{font-size:13px;color:var(--low);font-style:italic;margin:4px 0 6px;display:flex;align-items:center;gap:7px}
+.actline::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ember);
+  box-shadow:0 0 8px 1px var(--glow);animation:pulse 1.1s ease-in-out infinite;flex:0 0 auto}
+.trace{display:block;margin-top:4px}
+.trace .tstep{display:flex;gap:8px;align-items:baseline;padding:6px 0;font-size:13px;color:var(--mid);border-bottom:1px solid var(--line)}
+.trace .tstep:last-child{border-bottom:none}
+.trace .ti{flex:0 0 18px;text-align:center;opacity:.8;font-style:normal}
+/* one expandable action: rolled up by default, opens to thought/tool detail */
+.trace .trow{border-bottom:1px solid var(--line)}
+.trace .trow summary{display:flex;gap:8px;align-items:baseline;padding:6px 0;font-size:13px;
+  color:var(--mid);cursor:pointer;list-style:none}
+.trace .trow summary::-webkit-details-marker{display:none}
+.trace .trow summary::after{content:"⌄";margin-left:auto;color:var(--low);transition:transform .15s}
+.trace .trow[open] summary::after{transform:rotate(180deg)}
+.trace .tbody{padding:2px 0 10px 26px}
+.trace .think{font-size:12.5px;color:var(--low);font-style:italic;white-space:pre-wrap;
+  border-left:2px solid var(--line);padding-left:10px;max-height:220px;overflow-y:auto}
+.trace .klabel{font-size:11px;color:var(--low);text-transform:uppercase;letter-spacing:.06em;margin:6px 0 3px}
+.trace .tcode{font:12px/1.5 var(--mono);background:var(--s2);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:8px 10px;margin:0;white-space:pre-wrap;word-break:break-word;
+  max-height:200px;overflow-y:auto}
+/* the Viewer: Lara SHOWS things here. One component, two forms — a full-height
+   sheet on phones, a side panel the chat yields to on desktop. */
+#viewer{position:fixed;inset:0;z-index:65;background:var(--s0);display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top);border-left:1px solid var(--line)}
+#viewer[hidden]{display:none}
+.vtop{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.vtop .vname{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vtop .vpath{font:11.5px var(--mono);color:var(--low);display:block;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+#vBody{flex:1;overflow-y:auto;padding:14px 16px calc(20px + env(safe-area-inset-bottom))}
+#vBody pre.raw{font:13px/1.6 var(--mono);white-space:pre-wrap;word-break:break-word;margin:0}
+#vBody img{max-width:100%;border-radius:var(--r-md)}
+#vBody iframe{width:100%;height:100%;min-height:70vh;border:1px solid var(--line);
+  border-radius:var(--r-md);background:#fff}
+#vBody .vnote{font-size:13px;color:var(--low);font-style:italic;margin-bottom:10px}
+/* show_map: interactive Leaflet map + the numbered place list under it */
+#vBody .vmap{height:min(52vh,440px);border:1px solid var(--line);border-radius:var(--r-md);background:var(--s2)}
+.vmaptitle{font-weight:600;font-size:15px;margin-bottom:10px;color:var(--hi)}
+.vpin{background:none;border:none}
+.vpin span{display:flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border-radius:50%;background:var(--ember);color:var(--on-ember);font:600 13px var(--sans);
+  border:2px solid var(--s1);box-shadow:0 1px 5px rgba(0,0,0,.35)}
+.vplaces{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.vplace{display:flex;gap:10px;font-size:14px;line-height:1.45}
+.vplace .pn{flex:none;width:22px;height:22px;border-radius:50%;background:var(--ember);
+  color:var(--on-ember);font:600 12px/22px var(--sans);text-align:center;margin-top:1px}
+.vplace .pname{font-weight:600;color:var(--hi)}
+.vplace .pnote{color:var(--mid)}
+.vplace .plinks{margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+.vplace .plinks a,.leaflet-popup-content .plinks a{font-size:12px;color:var(--ember);
+  text-decoration:none;border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:3px 9px;background:var(--s2)}
+.vplace .plinks a:active{background:var(--s3)}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--s1);color:var(--hi);
+  box-shadow:0 3px 14px rgba(0,0,0,.4)}
+.leaflet-popup-content{font:14px/1.45 var(--sans);margin:10px 14px}
+.leaflet-popup-content .plinks{margin-top:6px;display:flex;gap:8px}
+.leaflet-container a.leaflet-popup-close-button{color:var(--low)}
+/* Claude-desktop layout: on a wide screen the conversations drawer DOCKS as
+   a permanent left sidebar — always visible, search on top; the hamburger
+   and scrim belong to the phone. Grid so header/main/nav share the right
+   column while the sidebar spans the full height. */
+@media (min-width:1100px){
+  #app{display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr);
+    grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-areas:"side header" "side main" "side nav"}
+  header{grid-area:header}
+  main{grid-area:main}
+  nav{grid-area:nav}
+  #drawer{display:block;position:relative;inset:auto;grid-area:side;z-index:1}
+  #drawer .scrim{display:none}
+  #drawer .panel{position:relative;inset:auto;width:100%;height:100%}
+  #drawerClose,#drawerBtn{display:none}
+  /* the search row shares the header's exact height so their bottom
+     borders form ONE continuous line across the app */
+  #drawer .panel .top{height:calc(58px + env(safe-area-inset-top));
+    padding:8px 12px;align-items:center;box-sizing:border-box}
+}
+/* Wide screens EARN more content, proportionally: the reading measure,
+   sidebar, viewer, and type all step up together — nothing is pinned to
+   phone-era widths on a 2K+ display. */
+@media (min-width:1440px){
+  :root{--measure:80ch;--sidebar:304px}
+}
+@media (min-width:1900px){
+  :root{--measure:88ch;--sidebar:328px}
+  #greeting{max-width:64ch}
+}
+@media (min-width:900px){
+  #viewer{left:auto;width:min(560px,46vw)}
+  /* the WHOLE app column yields as one unit — header, chat, composer, and nav
+     stay aligned with each other instead of shifting piecemeal */
+  #app{transition:right .2s ease}
+  body.viewer-open #app{right:min(560px,46vw)}
+  /* the viewer's top bar and the app header are the SAME height, so the two
+     bars and their border lines read as one continuous strip across the seam */
+  header,.vtop{height:58px;padding-top:0;padding-bottom:0;align-items:center}
+}
+@media (min-width:1900px){
+  /* AFTER the 900px viewer rules so these win the cascade on 2K+ */
+  #viewer{width:min(680px,40vw)}
+  body.viewer-open #app{right:min(680px,40vw)}
+}
+/* the terminal view: Lara's shell, live. Always dark — it's a terminal. */
+.term{background:#151210;border:1px solid #3a332c;border-radius:var(--r-md);
+  padding:12px 14px;font:13px/1.65 var(--mono);color:#e6ddd0;min-height:220px;overflow-y:auto}
+.term .tline{white-space:pre-wrap;word-break:break-all;margin-top:6px}
+.term .tline:first-child{margin-top:0}
+.term .tp{color:#f0883e;font-weight:600}
+.term .td{color:#8a7f72}
+.term .tc{color:#f4ede4}
+.term .tcur{display:inline-block;width:8px;height:14px;background:#f0883e;border-radius:1px;
+  vertical-align:text-bottom;margin-left:2px;animation:pulse 1.1s ease-in-out infinite}
+.term .tout{color:#b3a89c;margin:3px 0 4px;white-space:pre-wrap;word-break:break-word;font:12.5px/1.55 var(--mono)}
+.term.inline{min-height:0;max-height:300px;margin:2px 0 14px}
+/* folded shell session in the transcript — quiet line, expands to the terminal */
+.termfold summary{cursor:pointer;list-style:none;font-size:12.5px;color:var(--low);
+  padding:2px 0 8px;display:inline-block}
+.termfold summary::-webkit-details-marker{display:none}
+.termfold summary::after{content:" ⌄";color:var(--low)}
+.termfold[open] summary::after{content:" ⌃"}
+/* file chips under an answer */
+.artrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.artrow .btn{min-height:34px;padding:6px 13px;font-size:13px;gap:6px}
+/* memory browser sheet — full-screen, thumb-first */
+#memSheet{position:fixed;inset:0;z-index:70;background:var(--s0);display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top)}
+#memSheet[hidden]{display:none}
+.memtop{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);
+  max-width:760px;margin:0 auto;width:100%}
+.memtools{padding:10px 14px 4px;max-width:760px;margin:0 auto;width:100%}
+.memtools input{font-size:16px}
+.memchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+#memList{flex:1;overflow-y:auto;padding:10px 14px calc(24px + env(safe-area-inset-bottom));
+  max-width:760px;margin:0 auto;width:100%;overscroll-behavior:contain}
+/* scheduled jobs (System) */
+.jobrow{padding:10px 0;border-bottom:1px solid var(--line)}
+.jobrow:last-child{border-bottom:none}
+.jobrow .jname{font-weight:600;font-size:14.5px}
+.jobrow .jcron{font:12px var(--mono);color:var(--low)}
+.jobrow .jprompt{font-size:13px;color:var(--mid);margin:3px 0 7px}
+.jobrow .acts{display:flex;gap:8px}
+.jobrow .acts .btn{min-height:30px;padding:4px 12px;font-size:12.5px}
+.notecard .acts{margin-top:8px;display:flex;gap:8px}
+.notecard .acts .btn{min-height:36px;padding:6px 14px;font-size:13.5px}
+
+/* overlays */
+.overlay{position:fixed;inset:0;background:var(--scrim);z-index:80;display:flex;align-items:center;
+  justify-content:center;padding:18px}
+.overlay .card{width:100%;max-width:400px;max-height:88dvh;overflow-y:auto}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 14px);
+  background:var(--s3);border:1px solid var(--line);color:var(--hi);border-radius:999px;
+  padding:9px 18px;font-size:14px;z-index:90;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.updatepill{background:var(--ember);border-color:var(--ember);color:var(--on-ember);
+  cursor:pointer;font-weight:600}
+/* ---- desktop density ----
+   The phone sizing (16px body, 44pt targets, tall bars) reads oversized on a
+   desktop. On wide screens everything steps down a notch — type, chrome,
+   controls — while the phone keeps its thumb-first scale untouched. */
+@media (min-width:900px){
+  body{font-size:15px}
+  header{padding-top:8px;padding-bottom:8px}
+  .flame{width:32px;height:32px}.flame svg{width:17px;height:17px}
+  .htitle b{font-size:15px}#presence{font-size:11.5px}
+  nav{padding-bottom:0}
+  nav button{min-height:44px;padding:5px 0 7px;font-size:10.5px;max-width:132px;gap:2px}
+  nav button svg{width:19px;height:19px}
+  .msg{font-size:15px;line-height:1.6}
+  .msg.lara h1{font-size:21px}.msg.lara h2{font-size:17.5px}.msg.lara h3{font-size:15.5px}
+  .mrow{max-width:72ch}
+  #composer{padding:8px 12px}
+  #task{min-height:40px;max-height:110px;font-size:15px;padding:9px 14px}
+  #send,#attachBtn{min-width:40px;min-height:40px}
+  #send svg{width:19px;height:19px}
+  .btn{min-height:38px;padding:8px 15px;font-size:14px}
+  .btn.icon{min-width:38px;padding:8px}
+  .card{padding:14px}
+  h2{font-size:17px}h3{font-size:15px}
+  input[type=text],input[type=password],textarea,select{font-size:15px;padding:9px 12px}
+  #greeting{padding-top:10vh}
+  #greeting .gflame{width:52px;height:52px}#greeting .gflame svg{width:25px;height:25px}
+  #greeting h2{font-size:20px}#greeting .qa .btn{min-height:44px;font-size:13.5px}
+  .caret{height:16px}
+}
+/* 2K+ regains a step of type over the desktop-density floor — AFTER that
+   block so the cascade lands: 15px desktop, 16px/17px messages on 2K+. */
+@media (min-width:1900px){
+  body{font-size:16px}
+  .msg{font-size:17px}
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ONE bar: the flame + who/what, chat controls appear only on the Chat tab.
+       When Lara is resting on Chat, the presence line shows the conversation
+       title — no second title bar stacking under the header. -->
+  <header>
+    <button class="btn icon quiet chatctl" id="drawerBtn" aria-label="conversations" aria-expanded="false">☰</button>
+    <div class="flame rest" id="flame" role="img" aria-label="Lara">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2c.5 3.5-1.6 5.1-3 7-1.5 2-2.5 3.8-2.5 6A5.5 5.5 0 0 0 12 20.5 5.5 5.5 0 0 0 17.5 15c0-2.6-1.4-4.2-2.3-5.6-.4 1-.9 1.7-1.8 2.3.3-3.3-.4-6.6-1.4-9.7Z" fill="var(--ember)"/><path d="M12 20.5a3 3 0 0 1-3-3c0-1.4.8-2.3 1.6-3.3.5.8 1.1 1.2 1.9 1.5-.1-1.2 0-2.3.4-3.4 1.2 1.5 2.1 2.9 2.1 4.7a3 3 0 0 1-3 3Z" fill="var(--ember-hi)"/></svg>
+    </div>
+    <div class="htitle"><b id="agentName">Lara</b><span id="presence" aria-live="polite">resting</span></div>
+    <button id="badge" aria-label="pending approvals"></button>
+    <button class="btn icon quiet chatctl" id="newChatBtn" aria-label="new chat">＋</button>
+    <button class="btn icon quiet" id="themeBtn" aria-label="toggle theme">◐</button>
+  </header>
+
+  <div id="offbar" hidden>offline — showing what’s here; sending is paused</div>
+
+  <main id="main">
+    <!-- CHAT (the app opens here, in your last conversation) -->
+    <section class="view on" id="view-chat" role="tabpanel" aria-label="Chat">
+      <div id="msgs" aria-live="polite"></div>
+      <div id="composer">
+        <div id="attachRow" hidden></div>
+        <div class="composerRow">
+          <button class="btn quiet" id="attachBtn" aria-label="Attach a photo, video, or file">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="22" height="22"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L10 12.4a1.6 1.6 0 0 1-2.3-2.3l7.1-7.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <input id="fileIn" type="file" multiple hidden
+            accept="image/*,video/*,text/*,.txt,.md,.csv,.log,.json,.yaml,.yml,.py,.js,.ts,.html,.css">
+          <textarea id="task" rows="1" placeholder="Message Lara…" aria-label="Message Lara"></textarea>
+          <button class="btn danger icon" id="stopBtn" aria-label="stop">■</button>
+          <button id="send" aria-label="send"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12 20 4l-4.5 8L20 20 4 12Z" fill="currentColor"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAMILY -->
+    <section class="view" id="view-family" role="tabpanel" aria-label="Family">
+      <div class="stack">
+        <div class="card"><h2>Who’s here</h2><div id="famList" style="margin-top:8px"></div></div>
+        <div class="card"><h2>Groceries</h2>
+          <div id="groList" style="margin-top:8px"></div>
+          <div class="grocadd"><input type="text" id="groNew" placeholder="Add an item…" maxlength="300">
+          <button class="btn" id="groAdd">Add</button></div></div>
+        <div class="card"><h2>Approvals log</h2>
+          <p class="hint" style="margin:6px 0 4px">Recent decisions on actions that needed
+          a person's OK — who asked, what ran, who decided.</p>
+          <div id="apprLog" class="hint" style="margin-top:8px">Nothing yet.</div></div>
+        <div class="card"><h2>Shared with the family</h2>
+          <p class="hint" style="margin:6px 0 4px">Memories someone chose to share — nothing
+          appears here unless a person shared it from their Me tab.</p>
+          <div id="sharedList" class="hint" style="margin-top:8px">Nothing shared yet.</div></div>
+      </div>
+    </section>
+
+    <!-- ME -->
+    <section class="view" id="view-me" role="tabpanel" aria-label="Me">
+      <div class="stack">
+        <div class="card"><div class="row"><h2 class="grow" id="meName">Me</h2>
+          <button class="btn quiet" id="signOut">Sign out</button></div>
+          <div class="hint" id="meRole"></div></div>
+        <div class="card"><h2>Change my password</h2>
+          <label for="pwCur">Current password (or PIN)</label>
+          <input id="pwCur" type="password" autocomplete="current-password">
+          <label for="pwNew">New password (6+ characters)</label>
+          <input id="pwNew" type="password" autocomplete="new-password">
+          <button class="btn primary" id="pwGo" style="margin-top:12px;width:100%">Update password</button>
+          <div class="hint" id="pwMsg" aria-live="polite" style="margin-top:6px"></div></div>
+        <div class="card"><div class="row"><div class="grow"><h2>What Lara remembers about me</h2>
+          <div class="hint" id="memHint" style="margin-top:5px">Loading…</div></div>
+          <button class="btn" id="memBrowse">Browse</button></div></div>
+        <div class="card"><div class="row"><h2 class="grow">Scheduled for me</h2>
+          <span class="chip" id="myJobCount"></span></div>
+          <p class="hint" style="margin:6px 0 4px">Reminders and recurring jobs that run as you.
+          People can only send you notifications if you've allowed them.</p>
+          <div id="myJobList" class="hint" style="margin-top:6px">Loading…</div></div>
+      </div>
+    </section>
+
+    <!-- SYSTEM (admin) -->
+    <section class="view" id="view-system" role="tabpanel" aria-label="System">
+      <div class="stack">
+        <div class="card"><h2>Workshop</h2>
+          <p class="hint" style="margin:8px 0 12px">The full engine room — Lara’s mind, models,
+          jobs, network, backups — lives in the classic console while it moves in here.</p>
+          <a class="btn" href="/classic" style="text-decoration:none">Open the classic console →</a></div>
+        <div class="card"><h2>Right now</h2><div id="sysBody" class="hint" style="margin-top:8px">…</div></div>
+        <div class="card"><div class="row"><h2 class="grow">Lara’s dev sessions</h2>
+          <span class="chip" id="devChip">idle</span></div>
+          <p class="hint" style="margin:6px 0 8px">Her self-development work as it happens —
+          issue triage, forge cycles, gate runs, promotions. Straight from her journal.</p>
+          <div class="term" id="devTerm" style="max-height:340px"><div class="tout">waiting for activity…</div></div></div>
+        <div class="card"><div class="row"><h2 class="grow">Scheduled</h2><span class="chip" id="jobCount"></span></div>
+          <p class="hint" style="margin:6px 0 4px">Every recurring job on the box — yours and the
+          ones Lara has set for herself.</p>
+          <div id="jobList" class="hint" style="margin-top:6px">Loading…</div></div>
+      </div>
+    </section>
+  </main>
+
+  <nav role="tablist" aria-label="Main">
+    <button data-v="chat" class="on" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v11H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>Chat</button>
+    <button data-v="family" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="8" cy="9" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="10.5" r="2.4" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19c.6-2.8 2.4-4.4 4.5-4.4S12 16.2 12.5 19M13.5 18.6c.5-2 1.6-3.2 3-3.2s2.6 1.2 3 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Family</button>
+    <button data-v="me" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c.8-3.4 3.6-5.2 7-5.2s6.2 1.8 7 5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Me</button>
+    <button data-v="system" id="navSystem" style="display:none" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>System</button>
+  </nav>
+
+  <!-- the Viewer: where Lara shows files — sheet on phones, side panel on desktop -->
+  <div id="viewer" role="dialog" aria-label="Viewer" hidden>
+    <div class="vtop">
+      <button class="btn icon quiet" id="vClose" aria-label="close viewer">✕</button>
+      <div class="grow" style="min-width:0"><span class="vname" id="vName"></span>
+        <span class="vpath" id="vPath"></span></div>
+      <button class="btn quiet" id="vPreview" hidden>Preview</button>
+    </div>
+    <div id="vBody"></div>
+  </div>
+
+  <!-- memory browser: full-screen sheet for sifting, sharing, forgetting -->
+  <div id="memSheet" role="dialog" aria-modal="true" aria-label="My memory" hidden>
+    <div class="memtop">
+      <button class="btn icon quiet" id="memClose" aria-label="close">✕</button>
+      <h2 class="grow">My memory</h2><span class="chip" id="memCount"></span>
+    </div>
+    <div class="memtools">
+      <input type="text" id="memSearch" placeholder="Search my memories…" aria-label="search memories">
+      <div class="memchips" id="memTypes"></div>
+    </div>
+    <div id="memList"></div>
+  </div>
+
+  <!-- conversations drawer -->
+  <div id="drawer">
+    <div class="scrim" id="drawerScrim"></div>
+    <div class="panel" role="dialog" aria-modal="true" aria-label="Conversations">
+      <div class="top row">
+        <input type="text" id="chatSearch" placeholder="Search chats…" class="grow" style="font-size:16px">
+        <button class="btn icon quiet" id="drawerClose" aria-label="close">✕</button>
+      </div>
+      <div id="chatList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const BUILD='__UI_BUILD__';
+let ME=null, SID=localStorage.getItem('hearth-sid')||'', RID='', BUSY=false, PEND={};
+let KID_MODE=false;
+/* kid mode (issue #64): a minor gets the simplified chat register — no
+   pipeline metadata (how-trace, ctx/rung, thinking box) and no System tab.
+   CSS (body.kid) hides these; this guard also stops them from ever being
+   populated/expanded so nothing flashes into view before the CSS applies. */
+function applyKidMode(profile){
+  KID_MODE=!!(profile&&profile.role==='minor');
+  document.body.classList.toggle('kid',KID_MODE);
+}
+const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- tiny markdown (safe: escapes first) ---------- */
+function md(t){
+  let s=esc(t||'');
+  s=s.replace(/```([\s\S]*?)```/g,(m,c)=>'<pre><code>'+c.replace(/^\n|\n$/g,'')+'</code></pre>');
+  s=s.replace(/`([^`\n]+)`/g,'<code>$1</code>');
+  s=s.replace(/^### (.*)$/gm,'<h3>$1</h3>').replace(/^## (.*)$/gm,'<h2>$1</h2>').replace(/^# (.*)$/gm,'<h1>$1</h1>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/(^|\s)\*([^*\n]+)\*/g,'$1<i>$2</i>');
+  s=s.replace(/^\s*[-*] (.*)$/gm,'<li>$1</li>').replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g,'<ul>$1</ul>');
+  s=s.replace(/^\s*(\d+)\. (.*)$/gm,'<li>$2</li>');
+  s=s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // pipe tables: header row + |---| divider + body rows -> a real <table>
+  s=s.replace(/^\|(.+)\|[ \t]*\n\|[ \t:|-]+\|[ \t]*\n((?:\|.*\|[ \t]*\n?)*)/gm,(m,head,body)=>{
+    const cells=l=>l.replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+    const th=cells(head).map(h=>'<th>'+h+'</th>').join('');
+    const rows=body.trim().split('\n').filter(Boolean).map(l=>
+      '<tr>'+cells(l).map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');
+    return '<table><thead><tr>'+th+'</tr></thead><tbody>'+rows+'</tbody></table>\n';
+  });
+  return s.split(/\n{2,}/).map(p=>/^<(h\d|pre|ul|ol|li|table)/.test(p.trim())?p:'<p>'+p.replace(/\n/g,'<br>')+'</p>').join('');
+}
+async function jget(u){const r=await fetch(u+(u.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});
+  if(r.status===401){showLogin();throw new Error('auth')} return r.json();}
+async function jpost(u,d){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d||{})});
+  if(r.status===401&&u!=='/api/login'){showLogin();throw new Error('auth')} return r.json();}
+function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;
+  document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
+/* destructive actions confirm IN PLACE: first tap arms the button ("Sure?"),
+   a second tap within 2.6s commits, otherwise it disarms — no browser popups */
+function armThen(btn,label,fn){
+  if(btn.dataset.armed==='1'){
+    btn.dataset.armed='';btn.classList.remove('armed');fn();return;
+  }
+  btn.dataset.armed='1';
+  const orig=btn.textContent;
+  btn.textContent=label||'Sure?';btn.classList.add('armed');
+  setTimeout(()=>{if(btn.dataset.armed==='1'){
+    btn.dataset.armed='';btn.textContent=orig;btn.classList.remove('armed');}},2600);
+}
+
+/* ---------- presence flame ---------- */
+/* One header line under "Lara": her presence while she works, and the current
+   conversation's title when she's at rest on the Chat tab. */
+let PSTATE='rest', CHAT_TITLE='New chat';
+function presence(state,label){
+  PSTATE=state;const f=$('flame');f.className='flame '+state;
+  const atRestInChat=state==='rest'&&document.body.dataset.view==='chat';
+  $('presence').textContent=atRestInChat?CHAT_TITLE:label;
+}
+function setChatTitle(t){CHAT_TITLE=t||'New chat';if(PSTATE==='rest')presence('rest','resting');}
+/* the title doubles as the rename control — tap it and the TEXT goes live in
+   place (ember caret, selected, ready): Enter/tap-away saves, Esc cancels */
+function editInPlace(el,current,onSave){
+  if(el.isContentEditable)return;
+  el.textContent=current;
+  try{el.contentEditable='plaintext-only';}catch(e){el.contentEditable='true';}
+  el.classList.add('editing');el.focus();
+  const rg=document.createRange();rg.selectNodeContents(el);
+  const sel=getSelection();sel.removeAllRanges();sel.addRange(rg);
+  let done=false;
+  const finish=(save)=>{
+    if(done)return;done=true;
+    const nn=el.textContent.replace(/\s+/g,' ').trim().slice(0,80);
+    el.contentEditable='false';el.classList.remove('editing');
+    el.onkeydown=null;el.onblur=null;
+    onSave(save&&nn&&nn!==current?nn:null);
+  };
+  el.onkeydown=e=>{
+    if(e.key==='Enter'){e.preventDefault();finish(true);}
+    else if(e.key==='Escape'){e.stopPropagation();finish(false);}
+  };
+  el.onblur=()=>finish(true);
+}
+$('presence').onclick=()=>{
+  if(document.body.dataset.view!=='chat'||PSTATE!=='rest')return;
+  if(!SID||!$('msgs').querySelector('.mrow'))return;   // nothing to rename yet
+  editInPlace($('presence'),CHAT_TITLE,async nn=>{
+    if(nn){await jpost('/api/conversation/rename',{sid:SID,title:nn});
+      setChatTitle(nn);loadChats();toast('Renamed');}
+    else presence('rest','resting');                   // restore the title line
+  });
+};
+
+/* ---------- navigation ---------- */
+function show(v){
+  document.body.dataset.view=v;
+  if(PSTATE==='rest')presence('rest','resting');
+  document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='view-'+v));
+  document.querySelectorAll('nav [data-v]').forEach(b=>{const on=b.dataset.v===v;
+    b.classList.toggle('on',on);b.setAttribute('aria-selected',on);});
+  if(v==='family')loadFamily(); if(v==='me')loadMe();
+  if(v==='system'&&!KID_MODE)loadSystem(); if(v==='chat')setTimeout(()=>$('task').focus(),50);
+  localStorage.setItem('hearth-view',v);
+}
+document.querySelectorAll('nav [data-v]').forEach(b=>b.onclick=()=>show(b.dataset.v));
+
+/* ---------- theme ---------- */
+$('themeBtn').onclick=()=>{
+  const cur=document.documentElement.dataset.theme||'auto';
+  const next=cur==='auto'?'dark':cur==='dark'?'light':'auto';
+  if(next==='auto')delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme=next;
+  localStorage.setItem('hearth-theme',next);toast('Theme: '+next);
+};
+(()=>{const t=localStorage.getItem('hearth-theme');if(t&&t!=='auto')document.documentElement.dataset.theme=t;})();
+
+/* ---------- auth: login + wizard ---------- */
+let LOGIN_SHOWN=false;
+async function showLogin(){
+  if(LOGIN_SHOWN)return; LOGIN_SHOWN=true;
+  try{ME=await (await fetch('/api/me?_='+Date.now(),{cache:'no-store'})).json();}catch(e){}
+  if(ME&&ME.needs_setup)return showWizard();
+  const ov=document.createElement('div');ov.className='overlay';ov.id='loginOv';
+  ov.innerHTML='<div class="card" role="dialog" aria-modal="true" aria-label="Sign in">'+
+    '<h2>Sign in to Lara</h2>'+
+    '<label for="lu">Username</label><input id="lu" autocomplete="username" autocapitalize="none" spellcheck="false">'+
+    '<label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password">'+
+    '<label class="row" style="margin-top:12px;cursor:pointer;font-size:15px;color:var(--hi)">'+
+    '<input id="lr" type="checkbox" checked style="width:20px;height:20px"> Remember me on this device</label>'+
+    '<button class="btn primary" id="lgo" style="width:100%;margin-top:14px">Sign in</button>'+
+    '<div class="hint" style="margin-top:8px">Kids without a password: just your username. '+
+    'Old PINs still work as your password until you set one.</div>'+
+    '<div class="hint" id="lerr" style="color:var(--danger)" aria-live="polite"></div></div>';
+  document.body.appendChild(ov);
+  const go=async()=>{
+    $('lerr').textContent='';
+    const r=await jpost('/api/login',{username:$('lu').value,password:$('lp').value,remember:$('lr').checked});
+    if(r.ok)location.reload(); else{$('lerr').textContent=r.error||'sign-in failed';$('lp').value='';}
+  };
+  $('lgo').onclick=go; $('lp').onkeydown=e=>{if(e.key==='Enter')go()};
+  $('lu').onkeydown=e=>{if(e.key==='Enter')$('lp').focus()}; $('lu').focus();
+}
+function showWizard(){
+  const ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML='<div class="card" role="dialog" aria-modal="true" aria-label="Set up Lara">'+
+    '<h2>Welcome — let’s set up Lara</h2>'+
+    '<p class="hint">You’ll be the household admin. Add the family now or later.</p>'+
+    '<label for="wn">Your name</label><input id="wn" autocomplete="name" placeholder="Alex">'+
+    '<label for="wu">Username</label><input id="wu" autocapitalize="none" placeholder="alex">'+
+    '<label for="wp">Password (6+)</label><input id="wp" type="password" autocomplete="new-password">'+
+    '<label for="wpin">Quick PIN <span class="mut">(optional — approves kid requests fast)</span></label>'+
+    '<input id="wpin" type="password" inputmode="numeric" placeholder="4–6 digits">'+
+    '<div id="wm"></div><button class="btn quiet" id="wadd" style="margin-top:8px">+ Add a family member</button>'+
+    '<button class="btn primary" id="wgo" style="width:100%;margin-top:14px">Create household</button>'+
+    '<div class="hint" id="werr" style="color:var(--danger)" aria-live="polite"></div></div>';
+  document.body.appendChild(ov);
+  $('wn').oninput=()=>{if(!$('wu').dataset.t)$('wu').value=$('wn').value.toLowerCase().replace(/[^a-z0-9._-]/g,'')};
+  $('wu').oninput=()=>{$('wu').dataset.t=1};
+  $('wadd').onclick=()=>{const d=document.createElement('div');d.className='row wm';d.style.marginTop='8px';
+    d.innerHTML='<input class="n grow" placeholder="Name"><select class="r" style="width:88px">'+
+      '<option value="adult">adult</option><option value="minor">child</option></select>'+
+      '<input class="p grow" type="password" placeholder="Password (kids can skip)">';
+    $('wm').appendChild(d);};
+  $('wgo').onclick=async()=>{
+    $('werr').textContent='';
+    const members=[...document.querySelectorAll('.wm')].map(r=>({name:r.querySelector('.n').value.trim(),
+      role:r.querySelector('.r').value,password:r.querySelector('.p').value})).filter(m=>m.name);
+    const r=await jpost('/api/setup',{admin:{name:$('wn').value.trim(),username:$('wu').value.trim(),
+      password:$('wp').value,pin:$('wpin').value},members});
+    if(r.ok)location.reload(); else $('werr').textContent=r.error||'setup failed';
+  };
+  $('wn').focus();
+}
+
+/* ---------- chat ---------- */
+function mrow(html,cls){const w=document.createElement('div');w.className='mrow';
+  const m=document.createElement('div');m.className='msg '+cls;m.innerHTML=html;w.appendChild(m);
+  $('msgs').appendChild(w);$('msgs').scrollTop=$('msgs').scrollHeight;return m;}
+function autoGrow(){const t=$('task');t.style.height='auto';t.style.height=Math.min(120,t.scrollHeight)+'px';}
+$('task').addEventListener('input',autoGrow);
+$('task').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&matchMedia('(min-width:900px)').matches){e.preventDefault();sendMsg();}});
+$('send').onclick=sendMsg;
+$('stopBtn').onclick=async()=>{if(RID)await jpost('/api/cancel',{rid:RID});};
+// The new-chat empty state: a warm greeting + suggestion chips, rendered INTO
+// the message list only when the current chat has no turns. You land in it;
+// you're never navigated to it, and the moment you speak it's gone.
+const QUICK=[
+  ["What is happening in the house?","What’s happening in the house?"],
+  ["Summarize my day so far.","Summarize my day"],
+  ["What's the weather looking like today?","Weather today"],
+  ["What have you learned lately?","What have you learned?"]];
+function renderGreeting(){
+  if($('msgs').children.length)return;
+  const name=(ME&&ME.name)?(', '+ME.name.split(' ')[0]):'';
+  const g=document.createElement('div');g.id='greeting';
+  const h=new Date().getHours();
+  const sal=h<5?'Up late':h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+  g.innerHTML='<div class="gflame" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none">'+
+    '<path d="M12 2c.5 3.5-1.6 5.1-3 7-1.5 2-2.5 3.8-2.5 6A5.5 5.5 0 0 0 12 20.5 5.5 5.5 0 0 0 17.5 15c0-2.6-1.4-4.2-2.3-5.6-.4 1-.9 1.7-1.8 2.3.3-3.3-.4-6.6-1.4-9.7Z" fill="var(--ember)"/>'+
+    '<path d="M12 20.5a3 3 0 0 1-3-3c0-1.4.8-2.3 1.6-3.3.5.8 1.1 1.2 1.9 1.5-.1-1.2 0-2.3.4-3.4 1.2 1.5 2.1 2.9 2.1 4.7a3 3 0 0 1-3 3Z" fill="var(--ember-hi)"/></svg></div>'+
+    '<h2>'+sal+esc(name)+'</h2>'+
+    '<div class="gsub">Ask me anything, or start with one of these.</div>'+
+    '<div class="qa">'+QUICK.map(q=>'<button class="btn" data-q="'+esc(q[0])+'">'+esc(q[1])+'</button>').join('')+'</div>';
+  $('msgs').appendChild(g);
+  g.querySelectorAll('.qa .btn').forEach(b=>b.onclick=()=>{$('task').value=b.dataset.q;sendMsg();});
+}
+
+/* ---------- attachments: photos & sampled video frames (vision) + text files ---------- */
+let ATTACH=[];   // images/frames: {b64, thumb, label}
+let FILES=[];    // text files: {name, text}
+function attachRender(){
+  const row=$('attachRow');row.innerHTML='';row.hidden=!(ATTACH.length||FILES.length);
+  ATTACH.forEach((a,i)=>{
+    const d=document.createElement('div');d.className='att';
+    d.innerHTML='<img alt="attachment" src="'+a.thumb+'">'+(a.label?'<span class="n">'+esc(a.label)+'</span>':'')+
+      '<button class="x" aria-label="remove">✕</button>';
+    d.querySelector('.x').onclick=()=>{ATTACH.splice(i,1);attachRender();};row.appendChild(d);});
+  FILES.forEach((f,i)=>{
+    const d=document.createElement('div');d.className='att file';
+    d.innerHTML='<span>📄<br>'+esc(f.name.slice(0,16))+'</span><button class="x" aria-label="remove">✕</button>';
+    d.querySelector('.x').onclick=()=>{FILES.splice(i,1);attachRender();};row.appendChild(d);});
+}
+function canvasJpeg(src,w,h){
+  const MAX=1344,s=Math.min(1,MAX/Math.max(w,h));
+  const c=document.createElement('canvas');c.width=Math.round(w*s);c.height=Math.round(h*s);
+  c.getContext('2d').drawImage(src,0,0,c.width,c.height);return c.toDataURL('image/jpeg',0.85);
+}
+function addImage(file){return new Promise(res=>{const im=new Image();
+  im.onload=()=>{const url=canvasJpeg(im,im.naturalWidth,im.naturalHeight);
+    ATTACH.push({b64:url.split(',')[1],thumb:url,label:''});URL.revokeObjectURL(im.src);attachRender();res();};
+  im.onerror=()=>res();im.src=URL.createObjectURL(file);});}
+function addVideo(file){return new Promise(res=>{const v=document.createElement('video');
+  v.muted=true;v.preload='auto';v.src=URL.createObjectURL(file);
+  v.onloadedmetadata=async()=>{const dur=v.duration||0,n=Math.min(6,Math.max(2,Math.round(dur/5)));
+    for(let i=0;i<n&&ATTACH.length<6;i++){const tt=dur*(i+0.5)/n;
+      await new Promise(ok=>{v.onseeked=ok;v.currentTime=tt;});
+      const url=canvasJpeg(v,v.videoWidth,v.videoHeight);
+      ATTACH.push({b64:url.split(',')[1],thumb:url,label:file.name.slice(0,12)+' @'+Math.round(tt)+'s'});}
+    URL.revokeObjectURL(v.src);attachRender();res();};
+  v.onerror=()=>{toast('Couldn’t read that video');res();};});}
+function addTextFile(file){return new Promise(res=>{const r=new FileReader();
+  r.onload=()=>{FILES.push({name:file.name,text:String(r.result||'').slice(0,20000)});attachRender();res();};
+  r.onerror=()=>res();r.readAsText(file);});}
+async function filesPicked(files){
+  for(const f of files){
+    if(ATTACH.length>=6){toast('Up to 6 images (video frames count)');break;}
+    if(f.type.startsWith('video/'))await addVideo(f);
+    else if(f.type.startsWith('image/'))await addImage(f);
+    else if(f.type.startsWith('text/')||/\.(txt|md|csv|log|json|ya?ml|py|js|ts|html|css)$/i.test(f.name))await addTextFile(f);
+    else toast('I can see photos & videos and read text files');
+  }
+}
+$('attachBtn').onclick=()=>$('fileIn').click();
+$('fileIn').onchange=function(){filesPicked(this.files);this.value='';};
+document.addEventListener('paste',e=>{const items=[...(e.clipboardData?.items||[])].filter(i=>i.type.startsWith('image/'));
+  if(items.length){e.preventDefault();filesPicked(items.map(i=>i.getAsFile()).filter(Boolean));}});
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer?.files?.length)filesPicked(e.dataTransfer.files);});
+
+/* ---------- the Viewer: open a workspace file next to the conversation ---------- */
+function closeViewer(){$('viewer').hidden=true;document.body.classList.remove('viewer-open');}
+$('vClose').onclick=closeViewer;
+/* Leaflet loads lazily from /vendor (self-contained — no CDN) the first
+   time a map opens; tiles come from OpenStreetMap and need network. */
+let LEAFP=null;
+function loadLeaflet(){
+  if(window.L)return Promise.resolve();
+  if(LEAFP)return LEAFP;
+  LEAFP=new Promise((res,rej)=>{
+    const l=document.createElement('link');l.rel='stylesheet';l.href='/vendor/leaflet.css';
+    document.head.appendChild(l);
+    const s=document.createElement('script');s.src='/vendor/leaflet.js';
+    s.onload=()=>res();s.onerror=()=>{LEAFP=null;rej(new Error('leaflet'))};
+    document.head.appendChild(s);
+  });
+  return LEAFP;
+}
+function navLinks(p){ /* Apple/Google Maps launch buttons for one place */
+  const dest=encodeURIComponent(p.address?p.name+', '+p.address:p.lat+','+p.lon);
+  let h='<span class="plinks">'
+    +'<a href="https://maps.apple.com/?daddr='+dest+'" target="_blank" rel="noopener">Apple Maps</a>'
+    +'<a href="https://www.google.com/maps/dir/?api=1&destination='+dest+'" target="_blank" rel="noopener">Google Maps</a>';
+  if(p.url){try{const u=new URL(p.url);if(u.protocol==='https:'||u.protocol==='http:')
+    h+='<a href="'+esc(p.url)+'" target="_blank" rel="noopener">site</a>';}catch(e){}}
+  return h+'</span>';
+}
+async function renderMap(body,f){
+  let doc={};try{doc=JSON.parse(f.content||'{}');}catch(e){}
+  const places=(doc.places||[]).filter(p=>isFinite(p.lat)&&isFinite(p.lon));
+  if(!places.length){
+    const pre=document.createElement('pre');pre.className='raw';
+    pre.textContent=f.content||'';body.appendChild(pre);return;
+  }
+  if(doc.title){const t=document.createElement('div');t.className='vmaptitle';
+    t.textContent=doc.title;body.appendChild(t);}
+  const mdiv=document.createElement('div');mdiv.className='vmap';body.appendChild(mdiv);
+  const list=document.createElement('div');list.className='vplaces';body.appendChild(list);
+  places.forEach((p,i)=>{
+    const row=document.createElement('div');row.className='vplace';
+    row.innerHTML='<span class="pn">'+(i+1)+'</span><span><span class="pname">'
+      +esc(p.name)+'</span>'+(p.note?' — <span class="pnote">'+esc(p.note)+'</span>':'')
+      +'<br>'+navLinks(p)+'</span>';
+    list.appendChild(row);
+  });
+  try{await loadLeaflet();}catch(e){
+    mdiv.textContent='map view unavailable offline — the list below still works';
+    mdiv.style.cssText+='display:flex;align-items:center;justify-content:center;color:var(--low);font-size:13px';
+    return;
+  }
+  const map=L.map(mdiv,{zoomControl:true});
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+  const markers=[];
+  places.forEach((p,i)=>{
+    const ic=L.divIcon({className:'vpin',html:'<span>'+(i+1)+'</span>',
+      iconSize:[26,26],iconAnchor:[13,13],popupAnchor:[0,-14]});
+    const m=L.marker([p.lat,p.lon],{icon:ic}).addTo(map);
+    m.bindPopup('<b>'+esc(p.name)+'</b>'+(p.note?'<br>'+esc(p.note):'')
+      +'<br>'+navLinks(p));
+    markers.push(m);
+  });
+  const grp=L.featureGroup(markers);
+  map.fitBounds(grp.getBounds(),{padding:[34,34],maxZoom:15});
+  // the pane may have JUST become visible: measure again, then REFIT — a
+  // fitBounds computed at zero size leaves the pins out of the viewport
+  setTimeout(()=>{map.invalidateSize();
+    map.fitBounds(grp.getBounds(),{padding:[34,34],maxZoom:15});},150);
+}
+async function openViewer(relPath,note){
+  let f; try{f=await jget('/api/file?sid='+SID+'&path='+encodeURIComponent(relPath));}
+  catch(e){toast('Couldn’t open that file');return;}
+  if(!f.ok){toast(f.error||'Couldn’t open that file');return;}
+  $('vName').textContent=f.name;$('vPath').textContent=f.path;
+  const body=$('vBody');body.innerHTML='';
+  if(note){const n=document.createElement('div');n.className='vnote';n.textContent=note;body.appendChild(n);}
+  const pv=$('vPreview');pv.hidden=true;
+  if(f.kind==='image'){
+    const im=document.createElement('img');im.alt=f.name;im.src='data:'+f.mime+';base64,'+f.b64;
+    body.appendChild(im);
+  }else if(f.kind==='map'){
+    await renderMap(body,f);
+  }else if(f.kind==='markdown'){
+    const d=document.createElement('div');d.className='msg lara';d.innerHTML=md(f.content||'');
+    body.appendChild(d);
+  }else{
+    const pre=document.createElement('pre');pre.className='raw';pre.textContent=f.content||'';
+    body.appendChild(pre);
+    if(f.kind==='html'){
+      // source by default; Preview renders it in a NO-NETWORK sandboxed frame
+      pv.hidden=false;pv.textContent='Preview';
+      pv.onclick=()=>{
+        if(pv.textContent==='Preview'){
+          body.innerHTML='';const fr=document.createElement('iframe');
+          fr.setAttribute('sandbox','');fr.srcdoc=f.content||'';
+          body.appendChild(fr);pv.textContent='Source';
+        }else{body.innerHTML='';body.appendChild(pre);pv.textContent='Preview';}
+      };
+    }
+  }
+  if(f.truncated)body.insertAdjacentHTML('beforeend','<p class="hint">…truncated — the full file is longer.</p>');
+  $('viewer').hidden=false;
+  if(matchMedia('(min-width:900px)').matches)document.body.classList.add('viewer-open');
+  $('msgs').scrollTop=$('msgs').scrollHeight;
+}
+/* files this turn touched -> chips under the answer; a `show` step auto-opens */
+function artifactsFrom(steps){
+  const byPath=new Map();
+  (steps||[]).forEach(s=>{
+    if(!['read_file','write_file','show','show_map'].includes(s.tool))return;
+    let a={};try{a=JSON.parse(s.args||'{}');}catch(e){}
+    let p=a.path||'';
+    if(s.tool==='show_map'){
+      // the tool GENERATES the file — its path lives in the observation
+      const m=String(s.out||s.observation||'').match(/shared\/maps\/[\w.-]+\.json/);
+      if(!m)return;p=m[0];
+    }
+    if(!p)return;
+    const prev=byPath.get(p)||{path:p,show:false,note:'',map:false};
+    // she often read_file THEN show the same path — the show wins the flag
+    if(s.tool==='show'){prev.show=true;if(a.note)prev.note=a.note;}
+    if(s.tool==='show_map'){prev.show=true;prev.map=true;if(a.title)prev.note='';}
+    byPath.set(p,prev);
+  });
+  return [...byPath.values()];
+}
+function attachArtifacts(lm,steps,quiet){
+  const arts=artifactsFrom(steps);
+  if(!arts.length)return;
+  const row=document.createElement('div');row.className='artrow';
+  arts.forEach(a=>{
+    const b=document.createElement('button');b.className='btn quiet';
+    b.innerHTML=(a.map?'🗺 ':'📄 ')+esc(a.path.split('/').pop());b.title=a.path;
+    b.onclick=()=>openViewer(a.path,a.note);
+    row.appendChild(b);});
+  lm.appendChild(row);
+  const shown=arts.find(a=>a.show);
+  if(shown&&!quiet)openViewer(shown.path,shown.note);   // live show -> open it
+}
+/* a restored shell session: same folded look as a live one, no typing replay */
+/* a restored turn, told INLINE the way it happened live: what she said
+   between actions as real bubbles, shell/ssh as OPEN terminal blocks —
+   nothing rolled up (operator's call: "showcase them inline"). */
+function storyInline(steps){
+  const frag=document.createDocumentFragment();
+  let box=null;
+  (steps||[]).forEach(s=>{
+    if(s.said&&s.said.trim()){
+      box=null;                              // narration splits the terminal
+      const w=document.createElement('div');w.className='mrow';
+      const b=document.createElement('div');b.className='msg lara';
+      b.innerHTML=md(s.said);w.appendChild(b);frag.appendChild(w);
+    }
+    if(s.tool!=='shell'&&s.tool!=='ssh')return;
+    if(!box){
+      const w=document.createElement('div');w.className='mrow';
+      box=document.createElement('div');box.className='term inline';
+      w.appendChild(box);frag.appendChild(w);
+    }
+    let host='anvil',cmd='';
+    try{const a=JSON.parse(s.args||'{}');
+      if(s.tool==='ssh'){host=String(a.host||'remote').split('@').pop();cmd=a.cmd||'';}
+      else cmd=a.cmd||'';}catch(e){}
+    const line=document.createElement('div');line.className='tline';
+    line.innerHTML='<span class="tp">lara@'+esc(host)+'</span><span class="td">:~$</span> '+
+      '<span class="tc">'+esc(cmd)+'</span>';
+    box.appendChild(line);
+    const out=document.createElement('pre');out.className='tout';
+    out.textContent=s.out||s.observation||'';box.appendChild(out);
+  });
+  return frag.childNodes.length?frag:null;
+}
+
+/* ---------- Lara's shell, INLINE in the chat ----------
+   shell/ssh calls stream into a terminal block right in the conversation while
+   she's using it — the prompt types the command out, what she saw prints
+   beneath — and it STAYS there when the turn ends, part of the story.
+   Approved commands (one round-trip) replay the same way. */
+let TERM={count:0,queue:Promise.resolve(),box:null,wrap:null,anchor:null};
+function termReset(anchor){
+  TERM.count=0;TERM.box=null;TERM.wrap=null;TERM.anchor=anchor||null;
+}
+function termEnsure(){
+  if(TERM.box&&document.body.contains(TERM.box))return;
+  const wrap=document.createElement('div');wrap.className='mrow';
+  const box=document.createElement('div');box.className='term inline';
+  box.setAttribute('aria-live','polite');
+  wrap.appendChild(box);
+  if(TERM.anchor&&TERM.anchor.parentNode)$('msgs').insertBefore(wrap,TERM.anchor);
+  else $('msgs').appendChild(wrap);
+  TERM.box=box;TERM.wrap=wrap;
+  $('msgs').scrollTop=$('msgs').scrollHeight;
+}
+function termSettle(){
+  // she's done with the shell — the terminal STAYS open inline in the
+  // transcript (don't roll it up); only an empty box gets cleaned away
+  const box=TERM.box,wrap=TERM.wrap;
+  if(!box||!wrap)return;
+  TERM.box=null;TERM.wrap=null;
+  TERM.queue=TERM.queue.then(()=>{
+    if(!box.querySelectorAll('.tline').length)wrap.remove();
+  });
+}
+function termFeed(evts){
+  const mine=(evts||[]).filter(e=>e.tool==='shell'||e.tool==='ssh');
+  while(TERM.count<mine.length){
+    const ev=mine[TERM.count++];
+    TERM.queue=TERM.queue.then(()=>termPlay(ev));
+  }
+}
+function termPlay(ev){return new Promise(res=>{
+  termEnsure();
+  const box=TERM.box;if(!box){res();return;}
+  let host='anvil',cmd='';
+  try{const a=JSON.parse(ev.args||'{}');
+    if(ev.tool==='ssh'){host=String(a.host||'remote').split('@').pop();cmd=a.cmd||'';}
+    else cmd=a.cmd||'';}catch(e){}
+  const line=document.createElement('div');line.className='tline';
+  line.innerHTML='<span class="tp">lara@'+esc(host)+'</span><span class="td">:~$</span> '+
+    '<span class="tc"></span><span class="tcur" aria-hidden="true"></span>';
+  box.appendChild(line);
+  const tc=line.querySelector('.tc'),cur=line.querySelector('.tcur');
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let i=0;
+  // type the whole command in ~1.5s max, char-by-char for short ones
+  const step=reduce?(cmd.length||1):Math.max(1,Math.ceil(cmd.length/90));
+  const iv=setInterval(()=>{
+    i=Math.min(cmd.length,i+step);tc.textContent=cmd.slice(0,i);
+    box.scrollTop=box.scrollHeight;
+    if(i>=cmd.length){clearInterval(iv);cur.remove();
+      const out=document.createElement('pre');out.className='tout';
+      out.textContent=ev.out||ev.observation||'';
+      box.appendChild(out);box.scrollTop=box.scrollHeight;
+      setTimeout(res,140);}
+  },16);
+});}
+
+/* "How I got here": every action rolled up by default — expand any row to see
+   the thought chain that led to it and the tool call (args + what came back). */
+function howRow(icon,label,body,cls){
+  if(!body)return '<div class="tstep '+(cls||'')+'"><span class="ti">'+icon+'</span><span>'+esc(label)+'</span></div>';
+  return '<details class="trow '+(cls||'')+'"><summary><span class="ti">'+icon+'</span>'+esc(label)+'</summary>'+
+    '<div class="tbody">'+body+'</div></details>';
+}
+function buildHow(r,answerText){
+  if(KID_MODE){const d=document.createElement('div');d.style.display='none';return d;}
+  const steps=r.steps||[], tr=r.trace||[];
+  const secs=tr.length?Math.round(tr[tr.length-1].t):null;
+  const meta=document.createElement('div');meta.className='meta';
+  let rows='';
+  if(steps.length){
+    steps.forEach(s=>{
+      if(s.thought)rows+=howRow('🧠','thought it through',
+        '<div class="think">'+esc(s.thought)+'</div>','');
+      rows+=howRow('⚙','used '+s.tool+(s.danger?' (needed care)':''),
+        '<div class="klabel">called with</div><pre class="tcode">'+esc(s.args||'{}')+'</pre>'+
+        '<div class="klabel">got back</div><pre class="tcode">'+esc(s.observation||'(nothing)')+'</pre>','');
+    });
+  }else{
+    // no tools this turn — show the phase timeline instead
+    tr.forEach(s=>{rows+=howRow('·',(s.t||0)+'s — '+(s.phase||''),null,'');});
+  }
+  if(r.final_thought)rows+=howRow('🧠','thought about the answer',
+    '<div class="think">'+esc(r.final_thought)+'</div>','');
+  rows+=howRow('✎','answered'+(r.rung?' — '+r.rung:''),null,'');
+  const n=steps.length||tr.length;
+  meta.innerHTML='answered'+(secs?' in '+secs+'s':'')+
+    ' · <details class="trace"><summary>how ('+n+' '+(steps.length?'action'+(n===1?'':'s'):'steps')+')</summary>'+
+    rows+'</details>'+
+    ' · <button class="copyans" aria-label="copy this answer">copy</button>';
+  meta.querySelector('.copyans').onclick=e=>{
+    const txt=answerText||r.answer||'';
+    navigator.clipboard.writeText(txt).then(()=>{
+      e.target.textContent='copied ✓';
+      setTimeout(()=>{e.target.textContent='copy';},1400);
+    }).catch(()=>toast('Couldn’t copy'));
+  };
+  return meta;
+}
+
+async function sendMsg(){
+  if(!navigator.onLine){toast('You’re offline — I’ll be here when you’re back');return;}
+  let t=$('task').value.trim(); if((!t&&!ATTACH.length&&!FILES.length)||BUSY)return;
+  if(!SID){SID=crypto.randomUUID();localStorage.setItem('hearth-sid',SID);}
+  const g=$('greeting'); if(g)g.remove();          // first word clears the greeting
+  // Text files ride along as fenced context; images/frames go to the vision path.
+  const imgs=ATTACH.map(a=>a.b64), nImg=ATTACH.length, files=FILES.slice();
+  let prompt=t;
+  files.forEach(f=>{prompt+='\n\n--- attached file: '+f.name+' ---\n'+f.text;});
+  if(!t)t=nImg?'(see the attached image'+(nImg>1?'s':'')+')':'(see the attached file)';
+  const noteBits=[]; if(nImg)noteBits.push(nImg+' image'+(nImg>1?'s':'')); if(files.length)noteBits.push(files.length+' file'+(files.length>1?'s':''));
+  ATTACH=[];FILES=[];attachRender();
+  $('task').value='';autoGrow();BUSY=true;$('stopBtn').style.display='flex';
+  const noteHtml=noteBits.length?'<span class="attnote">📎 '+esc(noteBits.join(' · '))+'</span>':'';
+  mrow(esc(t)+noteHtml,'user');
+  let lm=mrow('','lara');
+  const th=document.createElement('div');th.className='thinkbox';th.style.display='none';
+  lm.parentNode.insertBefore(th,lm);
+  // Live activity: what she's DOING right now (recalling, checking the house,
+  // running a command…) — the transparency line, distinct from her thinking.
+  const act=document.createElement('div');act.className='actline';act.textContent='working…';
+  lm.parentNode.insertBefore(act,th);
+  RID=crypto.randomUUID();
+  termReset(lm.parentNode);          // fresh turn; shell appears above her reply
+  presence('think','thinking…');
+
+  // Terminal-style typewriter: the caret rides the WRITE HEAD and the text
+  // catches up to it a few characters at a time — instead of the whole partial
+  // appearing in 500ms jumps. `target` is the latest text the server has
+  // streamed; `shown` is how much has been "typed" on screen. While typing we
+  // show plain text (pre-wrap) so newlines read like a terminal; the moment
+  // she finishes, it settles into rendered markdown.
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let bodyEl=document.createElement('span');
+  let caret=document.createElement('span');caret.className='caret';caret.setAttribute('aria-hidden','true');
+  lm.classList.add('typing');lm.appendChild(bodyEl);lm.appendChild(caret);
+  let target='',shown=0;
+  const typer=setInterval(()=>{
+    if(shown>=target.length)return;
+    const backlog=target.length-shown;
+    // Reveal faster when a big chunk just arrived so we stay near real-time,
+    // but never dump it all at once — that's what makes it read as "typing".
+    shown=reduce?target.length:Math.min(target.length, shown+Math.max(1,Math.ceil(backlog/14)));
+    bodyEl.textContent=target.slice(0,shown);
+    $('msgs').scrollTop=$('msgs').scrollHeight;
+  },reduce?60:16);
+
+  // A tool boundary FREEZES the current narration bubble in place (rendered,
+  // permanent) and opens a fresh one below — so the story stays inline:
+  // said → terminal → said → … exactly as it happened, nothing overwritten.
+  let toolSeen=0,lastFrozen='';
+  const freeze=()=>{
+    if(!target.trim())return;
+    caret.remove();lm.classList.remove('typing');lm.innerHTML=md(target);
+    lastFrozen=target;target='';shown=0;
+    lm=mrow('','lara');
+    bodyEl=document.createElement('span');
+    caret=document.createElement('span');caret.className='caret';caret.setAttribute('aria-hidden','true');
+    lm.classList.add('typing');lm.appendChild(bodyEl);lm.appendChild(caret);
+    TERM.anchor=lm.parentNode;TERM.box=null;TERM.wrap=null;   // next command -> new box above the new bubble
+  };
+
+  // Live transport: SSE first (pushed snapshots, no 500ms battery drain), the
+  // old poll as the automatic fallback. Both feed the same applyLive().
+  const applyLive=p=>{
+    if(!p)return;
+    // The user switched chats (msgs was rebuilt): this turn's elements are
+    // detached, so STOP painting — feeding the shared terminal now would
+    // leak this chat's commands into whatever chat is open (issue #94).
+    // The durable transcript still records everything server-side.
+    if(!lm.isConnected)return;
+    if(p.steps&&p.steps.length)act.textContent=p.steps[p.steps.length-1]+'…';
+    if(p.tools&&p.tools.length){
+      if(p.tools.length>toolSeen){toolSeen=p.tools.length;freeze();}
+      termFeed(p.tools);
+    }
+    if(p.thinking&&!KID_MODE){th.style.display='';th.textContent=p.thinking.slice(-1200);th.scrollTop=th.scrollHeight;}
+    if(p.partial&&p.partial!==lastFrozen&&p.partial.length>=target.length){
+      if(!target)presence('speak','answering '+(ME&&ME.name||'you'));
+      target=p.partial;
+    }
+  };
+  const rid=RID;
+  let es=null,poll=null;
+  const startPoll=()=>{if(poll)return;
+    poll=setInterval(async()=>{try{applyLive(await jget('/api/progress?id='+rid));}catch(e){}},500);};
+  if(window.EventSource){
+    try{
+      es=new EventSource('/api/stream?id='+rid);
+      es.onmessage=ev=>{try{const m=JSON.parse(ev.data);applyLive(m.data);}catch(e){}};
+      es.onerror=()=>{if(es){es.close();es=null;}startPoll();};
+    }catch(e){startPoll();}
+  }else startPoll();
+
+  let r=null,err=null;
+  try{ r=await jpost('/api/ask',{task:prompt,sid:SID,rid:RID,tools:true,images:imgs}); }
+  catch(e){ err=e; }
+  if(es)es.close(); if(poll)clearInterval(poll);
+  BUSY=false;$('stopBtn').style.display='none';RID='';
+  act.remove();
+  th.style.display=th.textContent?'':'none';
+  presence('rest','resting');
+
+  const stopTyper=()=>{clearInterval(typer);lm.classList.remove('typing');};
+  const showError=(msg)=>{
+    lm.parentNode.remove();
+    const ec=mrow('<div class="errcard">I couldn’t finish that — '+esc(msg)+
+      '.<br><button class="btn" id="retryBtn">Try again</button></div>','lara');
+    $('task').value=t;autoGrow();
+    ec.querySelector('#retryBtn').onclick=()=>{ec.parentNode.remove();sendMsg();};
+  };
+  if(err&&!(r&&r.error)){
+    // The CONNECTION dropped (locked phone, network blip) — but she keeps
+    // working server-side and the answer persists to this chat + pushes.
+    // Watch the transcript for it to land instead of declaring failure.
+    stopTyper();termSettle();
+    lm.innerHTML='<p class="mut">connection hiccup — she’s still working; her answer will appear here…</p>';
+    const myTask=t, deadline=Date.now()+250000;   // ~the 240s server budget
+    const check=async()=>{
+      try{
+        const d=await jget('/api/conversation?sid='+SID);
+        const turns=d.turns||[];
+        for(let i=turns.length-1;i>0;i--){
+          if(turns[i].role==='assistant'&&turns[i-1].role==='user'
+             &&(turns[i-1].content||'').startsWith(myTask)){
+            clearInterval(watch);document.removeEventListener('visibilitychange',vis);
+            restoreChat();toast('Reconnected — her answer landed');return true;
+          }
+        }
+      }catch(e){}
+      return false;
+    };
+    const vis=()=>{if(document.visibilityState==='visible')check();};
+    document.addEventListener('visibilitychange',vis);
+    const watch=setInterval(async()=>{
+      if(await check())return;
+      if(Date.now()>deadline){clearInterval(watch);
+        document.removeEventListener('visibilitychange',vis);
+        showError('the connection dropped and the answer never arrived');}
+    },4000);
+    return;
+  }
+  if(err||!r||r.error){
+    stopTyper();termSettle();
+    showError((r&&r.error)||'something went wrong');
+    return;
+  }
+  if(r.status==='approve'){ stopTyper();termSettle();lm.parentNode.remove(); renderApproval(r,t); return; }
+  if(r.status==='cancelled'){ stopTyper();termSettle();lm.innerHTML='<p class="mut">Stopped.</p>'; return; }
+
+  // Let the caret finish typing out the final answer, THEN settle to markdown.
+  target=r.answer||'(no answer)';
+  const settle=()=>{
+    stopTyper();
+    termSettle();                     // shell's done -> it stays inline
+    lm.innerHTML=md(target);
+    attachArtifacts(lm,r.steps);
+    lm.appendChild(buildHow(r,target));
+    loadChats();
+  };
+  if(reduce||shown>=target.length){settle();}
+  else{const w=setInterval(()=>{if(shown>=target.length){clearInterval(w);settle();}},16);}
+}
+
+/* a live turn-follow shell: actline + thinkbox + typewriter message, fed by
+   SSE (poll fallback) on a rid. Used by the approval resume so approving
+   feels EXACTLY like asking — the terminal opens the moment the command runs
+   and the continued answer streams as she writes it. */
+function followTurn(rid,firstAct){
+  const wrap=document.createElement('div');wrap.className='mrow';
+  const th=document.createElement('div');th.className='thinkbox';th.style.display='none';
+  const act=document.createElement('div');act.className='actline';act.textContent=firstAct||'working…';
+  let lm=document.createElement('div');lm.className='msg lara';
+  wrap.appendChild(th);wrap.appendChild(act);wrap.appendChild(lm);
+  $('msgs').appendChild(wrap);
+  termReset(wrap);                       // shell/ssh stream inline ABOVE this turn
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let bodyEl=document.createElement('span');
+  let caret=document.createElement('span');caret.className='caret';caret.setAttribute('aria-hidden','true');
+  lm.classList.add('typing');lm.appendChild(bodyEl);lm.appendChild(caret);
+  let target='',shown=0;
+  const typer=setInterval(()=>{
+    if(shown>=target.length)return;
+    const backlog=target.length-shown;
+    shown=reduce?target.length:Math.min(target.length,shown+Math.max(1,Math.ceil(backlog/14)));
+    bodyEl.textContent=target.slice(0,shown);
+    $('msgs').scrollTop=$('msgs').scrollHeight;
+  },reduce?60:16);
+  // same inline story as sendMsg: a tool boundary freezes the narration
+  // bubble and opens a fresh one, so nothing she said gets overwritten
+  let toolSeen=0,lastFrozen='',frozen=0;
+  const freeze=()=>{
+    if(!target.trim())return;
+    caret.remove();lm.classList.remove('typing');lm.innerHTML=md(target);
+    lastFrozen=target;target='';shown=0;frozen++;
+    lm=mrow('','lara');
+    bodyEl=document.createElement('span');
+    caret=document.createElement('span');caret.className='caret';caret.setAttribute('aria-hidden','true');
+    lm.classList.add('typing');lm.appendChild(bodyEl);lm.appendChild(caret);
+    TERM.anchor=lm.parentNode;TERM.box=null;TERM.wrap=null;
+  };
+  const applyLive=p=>{
+    if(!p)return;
+    // chat switched away mid-resume: stop painting so the shared terminal
+    // can't leak this chat's commands into another one (issue #94)
+    if(!wrap.isConnected)return;
+    if(p.steps&&p.steps.length)act.textContent=p.steps[p.steps.length-1]+'…';
+    if(p.tools&&p.tools.length){
+      if(p.tools.length>toolSeen){toolSeen=p.tools.length;freeze();}
+      termFeed(p.tools);
+    }
+    if(p.thinking){th.style.display='';th.textContent=p.thinking.slice(-1200);th.scrollTop=th.scrollHeight;}
+    if(p.partial&&p.partial!==lastFrozen&&p.partial.length>=target.length)target=p.partial;
+  };
+  let es=null,poll=null;
+  const startPoll=()=>{if(poll)return;
+    poll=setInterval(async()=>{try{applyLive(await jget('/api/progress?id='+rid));}catch(e){}},500);};
+  if(window.EventSource){
+    try{es=new EventSource('/api/stream?id='+rid);
+      es.onmessage=ev=>{try{applyLive(JSON.parse(ev.data).data);}catch(e){}};
+      es.onerror=()=>{if(es){es.close();es=null;}startPoll();};
+    }catch(e){startPoll();}
+  }else startPoll();
+  const stopTyper=()=>{clearInterval(typer);lm.classList.remove('typing');};
+  return {
+    settle(r){                           // final answer -> markdown + trace
+      if(es)es.close();if(poll)clearInterval(poll);
+      act.remove();th.style.display=th.textContent?'':'none';
+      termSettle();
+      target=(r&&r.answer)||target||'';
+      const done=()=>{stopTyper();
+        lm.innerHTML=md(target||'(no answer)');
+        if(r){attachArtifacts(lm,r.steps);lm.appendChild(buildHow(r,target));}
+        loadChats();};
+      if(reduce||shown>=target.length)done();
+      else{const w=setInterval(()=>{if(shown>=target.length){clearInterval(w);done();}},16);}
+    },
+    abort(){                             // no answer to show here
+      if(es)es.close();if(poll)clearInterval(poll);
+      stopTyper();termSettle();
+      if(!frozen){wrap.remove();return;} // nothing happened — clean exit
+      // narration/terminals already told part of the story: KEEP them,
+      // remove only the live chrome + the empty trailing bubble
+      act.remove();th.style.display=th.textContent?'':'none';
+      if(!target.trim()){if(lm.parentNode!==wrap)lm.parentNode.remove();else lm.remove();}
+      else{caret.remove();lm.classList.remove('typing');lm.innerHTML=md(target);}
+    }
+  };
+}
+
+/* approval card v2 — per-card token, countdown, adult PIN when needed */
+function renderApproval(r,task,ageS){
+  const tok=r.token, p=r.pending||{};
+  const card=document.createElement('div');card.className='appr';card.dataset.token=tok;
+  const what=p.tool==='shell'?('run <code>'+esc((p.args||{}).cmd||'')+'</code>')
+    :p.tool==='ssh'?'reach another machine':(p.tool==='ha_call'||p.tool==='call_service')?'control the house'
+    :('use <b>'+esc(p.tool||'a tool')+'</b>');
+  card.innerHTML='<h4>Lara wants to '+what+'</h4>'+
+    '<div class="why">“'+esc(task)+'”</div>'+
+    '<details><summary>Show exactly what will run</summary><code>'+esc(JSON.stringify(p.args||{}))+'</code></details>'+
+    (r.adult_required?'<label for="apin-'+tok+'">Adult PIN</label><input id="apin-'+tok+'" type="password" inputmode="numeric" autocomplete="off">':'')+
+    '<div class="btns"><button class="btn primary allow">Allow</button><button class="btn deny">Not now</button></div>'+
+    '<div class="exp">expires in <span class="left">60:00</span></div>';
+  const w=document.createElement('div');w.className='mrow';w.appendChild(card);$('msgs').appendChild(w);
+  $('msgs').scrollTop=$('msgs').scrollHeight;
+  const t0=Date.now()-((ageS||0)*1000), LIFE=3600*1000;   // restored cards keep their true age
+  const tick=setInterval(()=>{const left=LIFE-(Date.now()-t0);
+    if(left<=0){clearInterval(tick);card.classList.add('expired');
+      card.querySelector('.exp').textContent='expired — ask again';
+      card.querySelectorAll('button').forEach(b=>b.disabled=true);return;}
+    const m=Math.floor(left/60000),s=Math.floor(left%60000/1000);
+    card.querySelector('.left').textContent=m+':'+String(s).padStart(2,'0');},1000);
+  const decide=async(dec)=>{
+    const pin=card.querySelector('#apin-'+tok);
+    // The decision is MADE the moment they tap — show ✓ allowed NOW. The old
+    // flow only flipped the card when /api/approve RETURNED, and that POST
+    // rides the whole resumed turn... so the card sat frozen until the NEXT
+    // approval (or the final answer) arrived. Optimistic chip + hidden (not
+    // destroyed) buttons, so a genuine refusal can put the card back.
+    clearInterval(tick);
+    card.classList.add('resolved');
+    const btns=card.querySelector('.btns');
+    btns.style.display='none';
+    const chip=document.createElement('span');
+    chip.className='chip '+(dec==='approve'?'ok':'');
+    chip.textContent=dec==='approve'?'✓ allowed':'not now';
+    btns.parentNode.insertBefore(chip,btns);
+    card.querySelector('.exp').textContent=dec==='approve'?'running it now…':'letting her know…';
+    const rid=crypto.randomUUID();
+    BUSY=true;                          // guards the wake-refresh from wiping this
+    const live=followTurn(rid, dec==='approve'?'running the approved command…':'continuing without it…');
+    let res=null,err=null;
+    try{ res=await jpost('/api/approve',{token:tok,decision:dec,sid:SID,pin:pin?pin.value:'',rid}); }
+    catch(e){ err=e; }
+    finally{ BUSY=false; }
+    if(err&&!res){
+      // The CONNECTION dropped mid-resume — the server got the decision and
+      // she's still working. Don't offer a retry (the token is consumed);
+      // keep the live follow and watch the transcript for the answer to land.
+      card.querySelector('.exp').textContent='connection wobbled — she’s still working…';
+      let before=-1;
+      const watch=setInterval(async()=>{
+        try{
+          const d=await jget('/api/conversation?sid='+SID);
+          const n=(d.turns||[]).length;
+          if(before<0){before=n;return;}
+          if(n>before){clearInterval(watch);live.abort();restoreChat();
+            toast('Reconnected — her answer landed');}
+        }catch(e){}
+      },4000);
+      setTimeout(()=>clearInterval(watch),300000);
+      return;}
+    if(!res||res.error){
+      live.abort();
+      const already=res&&/unknown or expired/i.test(res.error||'');
+      if(already){
+        card.querySelector('.exp').textContent='already handled on another device';
+        return;
+      }
+      // A real refusal (e.g. adult PIN needed) — put the card BACK.
+      chip.remove();btns.style.display='';
+      card.classList.remove('resolved');
+      card.querySelectorAll('.allow,.deny').forEach(b=>b.disabled=false);
+      card.querySelector('.exp').textContent=(res&&res.error)||'that didn’t go through — try again';
+      return;}
+    const ex=card.querySelector('.exp');if(ex)ex.remove();
+    if(res.status==='approve'){          // chained: she needs ANOTHER approval
+      live.abort();
+      renderApproval(res, task);
+      return;
+    }
+    if(res.answer)live.settle(res);
+    else live.abort();
+    loadChats();
+  };
+  card.querySelector('.allow').onclick=()=>decide('approve');
+  card.querySelector('.deny').onclick=()=>decide('deny');
+}
+
+/* conversations drawer */
+$('drawerBtn').onclick=()=>{$('drawer').classList.add('on');$('drawerBtn').setAttribute('aria-expanded','true');loadChats(true);};
+$('drawerScrim').onclick=$('drawerClose').onclick=()=>{$('drawer').classList.remove('on');
+  $('drawerBtn').setAttribute('aria-expanded','false');};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('drawer').classList.remove('on');});
+$('newChatBtn').onclick=()=>{SID=crypto.randomUUID();localStorage.setItem('hearth-sid',SID);
+  $('msgs').innerHTML='';setChatTitle('New chat');$('drawer').classList.remove('on');
+  renderGreeting();};
+let chatSearchT=null;
+$('chatSearch').oninput=()=>{clearTimeout(chatSearchT);chatSearchT=setTimeout(()=>loadChats(true),250);};
+async function loadChats(fill){
+  try{
+    // docked sidebar (wide screens) is always visible — keep it filled
+    fill=fill||matchMedia('(min-width:1100px)').matches;
+    const q=encodeURIComponent($('chatSearch').value||'');
+    const d=await jget('/api/conversations?sid='+SID+(q?'&q='+q:''));
+    const cur=(d.chats||[]).find(c=>c.sid===SID);
+    setChatTitle(cur?cur.title:'New chat');
+    if(!fill)return;
+    $('chatList').innerHTML='';
+    (d.chats||[]).forEach(c=>{
+      const r=document.createElement('div');r.className='chatrow'+(c.sid===SID?' on':'');
+      r.innerHTML='<button class="main"><span class="t">'+(c.pinned?'📌 ':'')+esc(c.title)+'</span>'+
+        '<span class="s">'+esc(c.when||'')+'</span></button>'+
+        '<button class="act" aria-label="rename">✎</button><button class="act" aria-label="delete">🗑</button>';
+      r.querySelector('.main').onclick=()=>{SID=c.sid;localStorage.setItem('hearth-sid',SID);
+        $('drawer').classList.remove('on');restoreChat();};
+      r.querySelectorAll('.act')[0].onclick=()=>{
+        // same in-place text edit as the header title, right in the row
+        const t=r.querySelector('.t');
+        if(!t||t.isContentEditable)return;
+        t.onclick=e=>e.stopPropagation();     // don't open the chat mid-edit
+        editInPlace(t,c.title,async nn=>{
+          if(nn){await jpost('/api/conversation/rename',{sid:c.sid,title:nn});
+            if(c.sid===SID)setChatTitle(nn);}
+          loadChats(true);                    // re-render row (pin glyph etc.)
+        });
+      };
+      r.querySelectorAll('.act')[1].onclick=e=>{
+        e.stopPropagation();
+        armThen(e.currentTarget,'Sure?',async()=>{
+          await jpost('/api/conversation/delete',{sid:c.sid});
+          if(c.sid===SID)$('newChatBtn').onclick();loadChats(true);});};
+      $('chatList').appendChild(r);
+    });
+  }catch(e){}
+}
+async function restoreChat(retry=0){
+  // FETCH FIRST, wipe second — the old order blanked the chat and then
+  // swallowed a failed fetch, so waking the phone with a not-yet-up radio
+  // showed 'fresh chat, history gone' (issue #93). A transient failure now
+  // keeps whatever is on screen and retries with backoff; auth failures
+  // route to the login card via jget.
+  let d;
+  try{d=await jget('/api/conversation?sid='+SID);}
+  catch(e){
+    if(String(e&&e.message)!=='auth'&&retry<4)
+      setTimeout(()=>restoreChat(retry+1),700*(retry+1));
+    return;
+  }
+  $('msgs').innerHTML='';
+  try{
+    (d.turns||[]).forEach(t=>{
+      if(t.role==='user'){mrow(esc(t.content),'user');return;}
+      // Assistant turns carry their "how it happened" meta: rebuild the folded
+      // shell, the artifact chips, and the how-trace — the transparency views
+      // now SURVIVE a reload instead of living only in the moment.
+      const m=t.meta;
+      if(m&&m.steps){const st=storyInline(m.steps);if(st)$('msgs').appendChild(st);}
+      const lm=mrow(md(t.content),'lara');
+      if(m){attachArtifacts(lm,m.steps,true);lm.appendChild(buildHow(m,t.content));}
+    });
+    // Pending approvals BELONG to the conversation: render live card(s) on
+    // WHATEVER device opens this chat — the fix for "the notification took me
+    // to the conversation but there was no approve button".
+    (d.pending||[]).forEach(p=>renderApproval(
+      {token:p.token,pending:p.pending,adult_required:p.adult_required,
+       requested_by:p.requested_by},
+      p.task||'(pending action)', p.age_s||0));
+    if(!(d.turns||[]).length&&!(d.pending||[]).length)renderGreeting();
+    $('msgs').scrollTop=$('msgs').scrollHeight;
+    loadChats();
+  }catch(e){}
+}
+
+/* ---------- pending approvals (header badge -> sheet, from any tab) ---------- */
+async function showApprovals(){
+  let a; try{a=await jget('/api/approvals');}catch(e){return;}
+  const pend=(a&&a.pending)||[];
+  const ov=document.createElement('div');ov.className='overlay';ov.id='apprOv';
+  const inner=pend.length?pend.map((pd,i)=>
+    '<div class="appr" data-i="'+i+'"><span class="chip info">'+esc(pd.who||'someone')+'</span>'+
+    '<h4>'+esc(pd.summary||('wants to use '+pd.tool))+'</h4>'+
+    '<div class="why">“'+esc(pd.why||'')+'”</div>'+
+    '<div class="btns"><button class="btn primary yes">Allow</button><button class="btn no">Not now</button></div></div>').join('')
+    :'<p class="hint">Nothing waiting — you’re all caught up.</p>';
+  ov.innerHTML='<div class="card" role="dialog" aria-modal="true" aria-label="Pending approvals">'+
+    '<div class="row"><h2 class="grow">Waiting for you</h2>'+
+    '<button class="btn icon quiet" id="apprClose" aria-label="close">✕</button></div>'+
+    '<div style="margin-top:10px">'+inner+'</div></div>';
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  $('apprClose').onclick=close; ov.onclick=e=>{if(e.target===ov)close();};
+  ov.querySelectorAll('.appr').forEach(c=>{
+    const pd=pend[+c.dataset.i];
+    const act=async dec=>{await jpost('/api/approve',{token:pd.token,decision:dec,sid:SID});
+      close();refreshBadge();};
+    c.querySelector('.yes').onclick=()=>act('approve');
+    c.querySelector('.no').onclick=()=>act('deny');
+  });
+}
+async function refreshBadge(){
+  try{const a=await jget('/api/approvals');const n=(a.pending||[]).length;
+    $('badge').style.display=n?'':'none';if(n)$('badge').textContent=n;
+  }catch(e){}
+}
+$('badge').onclick=showApprovals;
+
+/* ---------- family ---------- */
+async function loadFamily(){
+  try{const m=await jget('/api/me?x=1');
+    $('famList').innerHTML=(m.profiles||[]).map(p=>
+      '<div class="hkv"><span>'+esc(p.name)+(p.admin?' <span class="chip info">admin</span>':'')+'</span>'+
+      '<span class="v">'+esc(p.role==='minor'?'child':'adult')+'</span></div>').join('');
+  }catch(e){}
+  loadGroceries();
+  try{const a=await jget('/api/approvals/log');
+    const log=(a&&a.log)||[];
+    $('apprLog').innerHTML=log.length?log.slice(0,20).map(r=>{
+      const when=r.ts?new Date(r.ts*1000).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+      return '<div class="alogrow"><span class="chip '+(r.decision==='allowed'?'ok':'')+'">'+
+        esc(r.decision||'?')+'</span><span class="alogwhat"><b>'+esc(r.requested_by||'someone')+
+        '</b> asked to use '+esc(r.tool||'a tool')+
+        (r.what?' — <code>'+esc(String(r.what).slice(0,60))+'</code>':'')+
+        '</span><span class="alogmeta">'+esc(r.decided_by||'')+' · '+esc(when)+'</span></div>';
+    }).join(''):'Nothing yet — decisions will appear here as they happen.';
+  }catch(e){}
+  try{const mem=await jget('/api/memory?sid='+SID);
+    // ONLY memories a person explicitly shared. Lara's ambient house notes
+    // (owner "") are her own observations, NOT things the family shared —
+    // presenting them here broke trust ("I didn't share these").
+    const shared=(mem.notes||[]).filter(n=>n.personal&&(n.shared_with||[]).length);
+    $('sharedList').innerHTML=shared.length?shared.slice(0,30).map(n=>
+      '<div class="notecard"><div class="b">'+esc(n.body||'')+'</div>'+
+      '<div class="who">from '+esc(n.owner)+' · shared with '+
+      esc((n.shared_with||[]).includes('*')?'everyone':(n.shared_with||[]).join(', '))+'</div></div>').join('')
+      :'Nothing shared yet — share a memory from Me → “What Lara remembers about me”.';
+  }catch(e){}
+}
+
+/* ---------- shared family lists: the Groceries card ---------- */
+async function loadGroceries(){
+  let d;try{d=await jget('/api/lists');}catch(e){return;}
+  const items=((d&&d.lists)||{}).groceries||[];
+  const box=$('groList');box.innerHTML='';
+  if(!items.length){box.innerHTML='<p class="hint">Nothing on the list — add the first item below.</p>';}
+  items.forEach((it,i)=>{
+    const row=document.createElement('div');row.className='grorow'+(it.done?' done':'');
+    row.innerHTML='<button class="grocheck" aria-label="toggle">'+(it.done?'✓':'')+'</button>'+
+      '<span class="grotext">'+esc(it.text)+'</span>'+
+      (it.by?'<span class="groby">'+esc(it.by)+'</span>':'')+
+      '<button class="grox" aria-label="remove">✕</button>';
+    row.querySelector('.grocheck').onclick=async()=>{
+      try{await jpost('/api/lists/done',{sid:SID,index:i,done:!it.done});loadGroceries();}catch(e){}};
+    row.querySelector('.grox').onclick=async()=>{
+      try{await jpost('/api/lists/remove',{sid:SID,index:i});loadGroceries();}catch(e){}};
+    box.appendChild(row);
+  });
+}
+async function groAdd(){
+  const inp=$('groNew');const t=(inp.value||'').trim();
+  if(!t)return;
+  inp.value='';
+  try{await jpost('/api/lists/add',{sid:SID,text:t});}catch(e){toast('Couldn’t add that');}
+  loadGroceries();inp.focus();
+}
+$('groAdd').onclick=groAdd;
+$('groNew').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();groAdd();}});
+
+/* ---------- me: the memory mirror — see everything, share it, or forget it ---------- */
+function shareLabel(sw){
+  if(!sw||!sw.length)return 'private';
+  return 'shared with '+(sw.includes('*')?'everyone':sw.join(', '));
+}
+let MEM_MINE=[];   // my notes, cached for the browser sheet
+function noteCard(n){
+  const others=(ME&&ME.profiles||[]).map(p=>p.name).filter(x=>x!==(ME&&ME.name));
+  const d=document.createElement('div');d.className='notecard';
+  d.innerHTML='<div class="b">'+esc(n.body||'')+'</div>'+
+    '<div class="who"><span class="sh">'+esc(shareLabel(n.shared_with))+'</span> · '+esc(n.type||'note')+'</div>'+
+    '<div class="acts"><button class="btn quiet shareBtn">Share…</button>'+
+    '<button class="btn quiet forgetBtn">Forget</button></div>'+
+    '<div class="sharerow" hidden></div>';
+  const row=d.querySelector('.sharerow');
+  d.querySelector('.shareBtn').onclick=()=>{
+    if(!row.hidden){row.hidden=true;return;}
+    row.hidden=false;row.innerHTML='';
+    const cur=n.shared_with||[];
+    const opts=[['*','Everyone']].concat(others.map(o=>[o,o]));
+    opts.forEach(([val,label])=>{
+      const b=document.createElement('button');b.className='chipbtn'+(cur.includes(val)?' on':'');
+      b.textContent=label;
+      b.onclick=async()=>{
+        let next=(n.shared_with||[]).slice();
+        if(val==='*')next=next.includes('*')?[]:['*'];
+        else{next=next.filter(x=>x!=='*');
+          next=next.includes(val)?next.filter(x=>x!==val):next.concat([val]);}
+        const r=await jpost('/api/memory/share',{name:n.name,with:next,sid:SID});
+        if(r.ok){n.shared_with=r.shared_with;d.querySelector('.sh').textContent=shareLabel(n.shared_with);
+          row.hidden=true;toast(n.shared_with.length?'Shared':'Made private');}
+        else toast(r.error||'could not share');
+      };
+      row.appendChild(b);});
+    const priv=document.createElement('button');priv.className='chipbtn'+(cur.length?'':' on');
+    priv.textContent='Private';
+    priv.onclick=async()=>{
+      const r=await jpost('/api/memory/share',{name:n.name,with:[],sid:SID});
+      if(r.ok){n.shared_with=[];d.querySelector('.sh').textContent='private';row.hidden=true;toast('Made private');}
+      else toast(r.error||'failed');
+    };
+    row.appendChild(priv);
+  };
+  d.querySelector('.forgetBtn').onclick=e=>armThen(e.currentTarget,'Forget for good?',async()=>{
+    const r=await jpost('/api/memory/delete',{name:n.name,sid:SID});
+    if(r.ok){d.remove();MEM_MINE=MEM_MINE.filter(x=>x.name!==n.name);
+      $('memCount').textContent=MEM_MINE.length;memHintText();toast('Forgotten');}
+    else toast(r.error||'could not forget');
+  });
+  return d;
+}
+function memHintText(){
+  const shared=MEM_MINE.filter(n=>(n.shared_with||[]).length).length;
+  $('memHint').textContent=MEM_MINE.length
+    ?MEM_MINE.length+' memories · '+(shared?shared+' shared · ':'')+'private unless you share them'
+    :'Nothing yet — Lara remembers things as you chat.';
+}
+/* the browser sheet: search + type filters over ALL my notes */
+let MEM_Q='',MEM_TYPE='';
+function renderMemList(){
+  const q=MEM_Q.toLowerCase();
+  const rows=MEM_MINE.filter(n=>(!MEM_TYPE||n.type===MEM_TYPE)&&
+    (!q||(n.body||'').toLowerCase().includes(q)));
+  const box=$('memList');box.innerHTML='';
+  $('memCount').textContent=rows.length===MEM_MINE.length?MEM_MINE.length:(rows.length+' / '+MEM_MINE.length);
+  if(!rows.length){box.innerHTML='<p class="hint" style="padding:14px 2px">Nothing matches.</p>';return;}
+  rows.slice(0,200).forEach(n=>box.appendChild(noteCard(n)));
+  if(rows.length>200)box.insertAdjacentHTML('beforeend','<p class="hint">…and '+(rows.length-200)+' more — narrow the search.</p>');
+}
+function openMemSheet(){
+  const sheet=$('memSheet');sheet.hidden=false;
+  const types=[...new Set(MEM_MINE.map(n=>n.type||'note'))].sort();
+  const tbox=$('memTypes');tbox.innerHTML='';
+  [['','All']].concat(types.map(t=>[t,t])).forEach(([val,label])=>{
+    const b=document.createElement('button');b.className='chipbtn'+(MEM_TYPE===val?' on':'');
+    b.textContent=label;
+    b.onclick=()=>{MEM_TYPE=val;[...tbox.children].forEach(c=>c.classList.toggle('on',c===b));renderMemList();};
+    tbox.appendChild(b);});
+  renderMemList();$('memSearch').focus();
+}
+$('memBrowse').onclick=openMemSheet;
+$('memClose').onclick=()=>{$('memSheet').hidden=true;};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('memSheet').hidden=true;closeViewer();}});
+let memSearchT=null;
+$('memSearch').oninput=()=>{clearTimeout(memSearchT);
+  memSearchT=setTimeout(()=>{MEM_Q=$('memSearch').value;renderMemList();},200);};
+
+function jobRow(j,into,afterChange){
+  const r=document.createElement('div');r.className='jobrow';
+  r.innerHTML='<div class="row"><span class="jname grow">'+esc(j.name)+'</span>'+
+    (j.notify?'<span class="chip info">→ '+esc(j.notify)+'</span>':'')+
+    '<span class="chip '+(j.enabled?'ok':'')+'">'+(j.enabled?'on':'off')+'</span></div>'+
+    '<div class="jcron">'+esc(j.cron)+'</div>'+
+    '<div class="jprompt">'+esc((j.prompt||'').slice(0,140))+'</div>'+
+    '<div class="acts"><button class="btn quiet tog">'+(j.enabled?'Pause':'Resume')+'</button>'+
+    '<button class="btn quiet run">Run now</button>'+
+    '<button class="btn quiet del">Delete</button></div>';
+  r.querySelector('.tog').onclick=async()=>{await jpost('/api/jobs/toggle',{name:j.name,sid:SID});afterChange();};
+  r.querySelector('.run').onclick=async()=>{toast('Running '+j.name+'…');
+    await jpost('/api/jobs/run',{name:j.name,sid:SID});toast(j.name+' finished');};
+  r.querySelector('.del').onclick=e=>armThen(e.currentTarget,'Delete?',async()=>{
+    await jpost('/api/jobs/delete',{name:j.name,sid:SID});afterChange();});
+  into.appendChild(r);
+}
+async function loadMyJobs(){
+  let d; try{d=await jget('/api/jobs?sid='+SID);}catch(e){$('myJobList').textContent='—';return;}
+  // The server scopes non-admins to their own jobs already; an admin gets ALL,
+  // so trim to "runs as me" here (the full fleet lives on System).
+  const mine=(d.jobs||[]).filter(j=>!j.owner||j.owner===(ME&&ME.name));
+  $('myJobCount').textContent=mine.length||'';
+  if(!mine.length){$('myJobList').textContent='Nothing scheduled for you.';return;}
+  $('myJobList').innerHTML='';
+  mine.forEach(j=>jobRow(j,$('myJobList'),loadMyJobs));
+}
+async function loadMe(){
+  $('meName').textContent=ME&&ME.name?ME.name:'Me';
+  $('meRole').textContent=ME?((ME.admin?'household admin · ':'')+(ME.role||'')+' · @'+(ME.username||'')):'';
+  loadMyJobs();
+  try{const mem=await jget('/api/memory?sid='+SID);
+    MEM_MINE=(mem.notes||[]).filter(n=>n.mine);
+    memHintText();
+    if(!$('memSheet').hidden)renderMemList();
+  }catch(e){$('memHint').textContent='Could not load memory.';}
+}
+$('signOut').onclick=async()=>{await jpost('/api/logout',{});location.reload();};
+$('pwGo').onclick=async()=>{
+  $('pwMsg').textContent='';
+  const r=await jpost('/api/password',{current:$('pwCur').value,new:$('pwNew').value});
+  $('pwMsg').textContent=r.ok?'Password updated ✓':(r.error||'failed');
+  if(r.ok){$('pwCur').value='';$('pwNew').value='';}
+};
+
+/* ---------- system ---------- */
+async function loadSystem(){
+  try{const p=await jget('/api/pulse?sid='+SID);
+    $('sysBody').innerHTML='<div class="hkv"><span>Autopilot</span><span class="v">'+(p.auto_pulse?'running':'paused')+'</span></div>'+
+      '<div class="hkv"><span>Memories</span><span class="v">'+(p.notes||0)+'</span></div>'+
+      '<div class="hkv"><span>Self-dev today</span><span class="v">'+(p.self_dev_today||0)+'/'+(p.self_dev_cap||3)+'</span></div>'+
+      '<div class="hkv"><span>Cloud spend</span><span class="v">$'+(p.spent_today||0)+'</span></div>';
+  }catch(e){$('sysBody').textContent='—';}
+  loadJobs();loadDevFeed();
+}
+/* Lara's dev sessions: her journal lines about self-dev work, rendered as a
+   terminal and kept live while System is on screen. Admin-only server-side
+   (the journal endpoint already gates), so this is safe to poll. */
+const DEV_MARKS=/\[(selfdev|issuework|deep-sleep|forge|promote|gate)\]/;
+let DEV_SEEN=new Set();
+async function loadDevFeed(){
+  let d; try{d=await jget('/api/journal?sid='+SID);}catch(e){return;}
+  const lines=(d.journal||[]).map(String).filter(l=>DEV_MARKS.test(l));
+  const box=$('devTerm');
+  const fresh=lines.filter(l=>!DEV_SEEN.has(l));
+  if(!DEV_SEEN.size&&!lines.length){box.innerHTML='<div class="tout">quiet — no dev work in the recent journal.</div>';}
+  if(fresh.length){
+    if(!DEV_SEEN.size)box.innerHTML='';
+    fresh.forEach(l=>{DEV_SEEN.add(l);
+      const el=document.createElement('div');el.className='tout';
+      el.textContent=l.replace(/^-\s*/,'');box.appendChild(el);});
+    box.scrollTop=box.scrollHeight;
+  }
+  const last=lines[lines.length-1]||'';
+  const m=last.match(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2})/);
+  $('devChip').textContent=m?('last: '+m[1].slice(5)):'idle';
+}
+setInterval(()=>{
+  if(document.hidden||document.body.dataset.view!=='system')return;
+  loadDevFeed();
+},5000);
+
+async function loadJobs(){
+  let d; try{d=await jget('/api/jobs?sid='+SID);}catch(e){$('jobList').textContent='—';return;}
+  const jobs=d.jobs||[];
+  $('jobCount').textContent=jobs.length||'';
+  if(!jobs.length){$('jobList').textContent='No scheduled jobs.';return;}
+  $('jobList').innerHTML='';
+  jobs.forEach(j=>{
+    jobRow(j,$('jobList'),loadJobs);
+    if(j.owner)$('jobList').lastChild.querySelector('.jcron').textContent+=' · runs as '+j.owner;
+  });
+}
+
+/* ---------- offline awareness ---------- */
+function setOnline(on){
+  $('offbar').hidden=on;
+  $('send').disabled=!on;
+  if(on)checkBuild();          // back online -> catch any build shipped meanwhile
+}
+window.addEventListener('online',()=>setOnline(true));
+window.addEventListener('offline',()=>setOnline(false));
+
+/* ---------- PWA self-update ----------
+   An installed iOS PWA holds its old shell and never re-fetches on relaunch,
+   so shipped fixes "never arrive" (the classic console learned this first).
+   Poll the build number; when it changes and Lara isn't mid-answer, reload. */
+let UPDATE_READY=false;
+async function checkBuild(){
+  if(BUSY||UPDATE_READY)return;
+  if(BUILD.indexOf('__')===0)return;   // raw file (token unreplaced): never loop-reload
+  try{const v=await jget('/api/version');
+    if(v&&String(v.build)!==BUILD){
+      // POLITE update: never yank the page mid-reading. Hidden -> swap now
+      // (invisible); visible -> offer a pill, and swap on the next background.
+      if(document.hidden){location.reload();return;}
+      UPDATE_READY=true;
+      const p=document.createElement('button');
+      p.className='toast updatepill';p.textContent='Update ready — tap to refresh';
+      p.onclick=()=>location.reload();
+      document.body.appendChild(p);
+    }
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    checkBuild();
+    refreshBadge();                    // waking the app must show approvals NOW
+    if(document.body.dataset.view==='chat'&&!BUSY)restoreChat();   // + any pending card
+  }
+  else if(UPDATE_READY&&!BUSY)location.reload();   // backgrounded -> swap invisibly
+});
+setInterval(checkBuild,90000);
+
+/* ---------- approval badge poll (gentle, hidden-aware) ---------- */
+setInterval(async()=>{
+  if(document.hidden)return;
+  refreshBadge();
+},15000);
+
+/* ---------- boot ---------- */
+(async()=>{
+  try{ME=await (await fetch('/api/me?_='+Date.now(),{cache:'no-store'})).json();}catch(e){}
+  if(ME&&ME.needs_setup){showWizard();return;}
+  if(ME&&ME.auth_on&&!ME.authed){showLogin();return;}
+  if(ME&&ME.admin)$('navSystem').style.display='';
+  if('serviceWorker' in navigator){try{navigator.serviceWorker.register('/sw.js');}catch(e){}}
+  // Notification deep-link: a tapped push carries ?chat=<sid> or ?approvals=1
+  // (the SW navigates the window to that url). Honor it, THEN scrub the query
+  // so a later reload/bookmark doesn't re-trigger it.
+  const q=new URLSearchParams(location.search);
+  const deepChat=q.get('chat'), deepAppr=q.get('approvals');
+  if(deepChat){SID=deepChat;localStorage.setItem('hearth-sid',SID);}
+  if(deepChat||deepAppr){try{history.replaceState({},'',location.pathname);}catch(e){}}
+  // The app IS the conversation — open in your last chat, whatever tab you left
+  // on. (Home is gone; a stored 'home' from an old build maps to chat.)
+  let v=localStorage.getItem('hearth-view')||'chat';
+  if(v==='home')v='chat';
+  if(v==='system'&&!(ME&&ME.admin))v='chat';
+  show(deepChat?'chat':v);          // a chat deep-link forces the Chat tab
+  if(SID)restoreChat(); else renderGreeting();
+  refreshBadge();
+  if(deepAppr)showApprovals();              // push-to-approve -> open the sheet
+  if(!navigator.onLine)setOnline(false);   // launched offline (cached shell)
+  checkBuild();          // stale installed shell? catch it at launch, not 90s in
+})();
+</script>
+</body>
+</html>

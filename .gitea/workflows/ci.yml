@@ -1,0 +1,34 @@
+# ANVIL CI — independent verification gate for the promotion pipeline.
+#
+# Runs `python -m anvil doctor` (the full self-test suite) on a clean checkout,
+# on a runner, on every push to `test`, every PR into `main`, and every push to
+# `main`. This is ground truth INDEPENDENT of the harness's own self-report — a
+# confident-but-wrong "it's green" can't slip a change toward main. See docs/cicd.md.
+#
+# Activates once a Gitea Actions runner is registered (`act_runner`). If your
+# runner registers a different label than `ubuntu-latest`, change `runs-on` to it.
+name: ANVIL CI
+
+on:
+  push:
+    branches: [test, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the change
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The core harness runs on the Python standard library alone, so no install
+      # step is needed for `doctor`. (Add `pip install -e .` here if a future test
+      # suite depends on an optional package.)
+      - name: Run ANVIL doctor (full self-test suite)
+        run: python -m anvil doctor

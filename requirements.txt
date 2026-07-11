@@ -1,0 +1,26 @@
+# ANVIL core needs NOTHING here — it runs on the Python standard library alone.
+# These are all OPTIONAL and light up richer features when present.
+
+# Exact token counting (otherwise a chars/4 estimate is used).
+tiktoken>=0.7
+
+# Two-way Discord control from your phone (outbound webhooks work without it).
+discord.py>=2.3
+
+# Reading anvil.toml on Python < 3.11 (3.11+ has stdlib tomllib).
+tomli>=2.0 ; python_version < "3.11"
+
+# Finer-grained scheduling than the built-in cron loop (optional).
+APScheduler>=3.10
+
+# Web Push (PWA phone notifications): VAPID signing + aes128gcm payload
+# encryption. Without it the app still installs as a PWA; only push is disabled.
+cryptography>=41
+# CA bundle so push delivery to Apple/Google can verify TLS on Windows (the
+# stdlib default context often can't find the issuer there).
+certifi>=2023.7
+
+# Clean main-text extraction for web_fetch (readable article text instead of
+# raw HTML soup - what the model grounds its answers on). Falls back to a
+# crude tag-strip when absent.
+trafilatura>=2.0
