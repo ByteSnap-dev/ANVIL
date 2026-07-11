@@ -2,12 +2,16 @@
 
 **Adaptive Notes · Verification · Inference · Liaison**
 
-A lean, local-first agent harness for a household AI assistant. Your data —
-memory, conversations, schedules, house state — lives on your box; the models
-are pluggable rungs on a **tiered ladder** the router climbs only as far as a
-task actually needs. The reference configuration runs an all-Claude ladder
-(Haiku → Sonnet → Opus → Fable); the same harness drives local Ollama models,
-Ollama Cloud, or any mix — every provider call is raw stdlib `urllib`, no SDK.
+A lean, self-hosted agent harness for a household AI assistant. Your data —
+memory, conversations, schedules, house state — lives on your box and never
+syncs to anyone's cloud; the *intelligence* is a pluggable **tiered ladder**
+the router climbs only as far as a task actually needs. The reference
+configuration is honest about its trade: it runs an all-Claude ladder
+(Haiku → Sonnet → Opus → Fable), so prompts go to the Anthropic API over TLS
+and an internet outage pauses the assistant. The same harness runs fully
+local on Ollama models (its original mode), Ollama Cloud, or any mix — the
+ladder is config, not code, and every provider call is raw stdlib `urllib`,
+no SDK.
 
 The assistant it ships is **Lara**: a persistent family agent with a PWA chat
 surface, evidence-gated long-term memory, an autonomous background mind, and a
